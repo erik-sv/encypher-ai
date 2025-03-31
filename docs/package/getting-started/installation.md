@@ -4,7 +4,7 @@ EncypherAI is available on PyPI and can be installed using uv.
 
 ## Requirements
 
-- Python 3.8 or later
+- Python 3.9 or later
 - uv (Python package installer)
 
 ## Basic Installation
@@ -21,8 +21,8 @@ For development purposes, you can install EncypherAI with additional development
 
 ```bash
 # Clone the repository
-git clone https://github.com/erik-sv/encypher_ai.git
-cd encypher_ai
+git clone https://github.com/encypherai/encypher-ai.git
+cd encypher-ai
 
 # Install with development dependencies
 uv pip install -e ".[dev]"

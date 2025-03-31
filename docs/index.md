@@ -20,6 +20,15 @@ This documentation provides comprehensive information about the EncypherAI packa
 | 🌊 **Streaming Support** | Compatible with chunk-by-chunk streaming |
 | 🔄 **Extensible API** | Easily integrate with any LLM provider |
 
+## Demo Video
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=amE_utPpEy0">
+    <img src="https://img.youtube.com/vi/amE_utPpEy0/0.jpg" alt="EncypherAI Demo Video" width="600"/>
+  </a>
+  <p>Watch our demo video to see EncypherAI in action</p>
+</div>
+
 ## Getting Started
 
 - [Installation](package/getting-started/installation.md)
@@ -56,4 +65,4 @@ EncypherAI is provided under a dual licensing model designed to support both ope
 
 ## GitHub Repository
 
-Visit our [GitHub repository](https://github.com/erik-sv/encypher_ai) to access the source code, report issues, or contribute to the project.
+Visit our [GitHub repository](https://github.com/encypherai/encypher-ai) to access the source code, report issues, or contribute to the project.

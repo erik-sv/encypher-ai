@@ -5,7 +5,7 @@
 # EncypherAI Core
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-docs.encypherai.com-blue)](https://docs.encypherai.com)
 
 A Python package for embedding and extracting metadata in text using Unicode variation selectors without affecting readability.
@@ -20,6 +20,12 @@ EncypherAI Core provides tools for invisibly encoding metadata (such as model in
 - **Streaming support**: Works with both streaming and non-streaming LLM outputs
 
 The encoding is done using Unicode variation selectors, which are designed to specify alternative forms of characters without affecting text appearance or readability.
+
+## Demo Video
+
+[![EncypherAI Demo Video](https://img.youtube.com/vi/amE_utPpEy0/0.jpg)](https://www.youtube.com/watch?v=amE_utPpEy0)
+
+Watch our demo video to see EncypherAI in action, demonstrating how to embed and verify metadata in AI-generated content.
 
 ## Installation
 

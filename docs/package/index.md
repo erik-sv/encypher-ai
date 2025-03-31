@@ -31,7 +31,7 @@ With EncypherAI, you can:
 - [Installation](getting-started/installation.md)
 - [Quick Start Guide](getting-started/quickstart.md)
 - [Examples](examples/jupyter.md)
-- [GitHub Repository](https://github.com/erik-sv/encypher_ai)
+- [GitHub Repository](https://github.com/encypherai/encypher-ai)
 
 ## Why EncypherAI?
 

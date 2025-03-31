@@ -11,7 +11,7 @@ Before you begin, make sure you have:
 3. EncypherAI installed
 
 ```bash
-uv pip install encypher anthropic
+uv pip install encypher-ai anthropic
 ```
 
 ## Basic Integration
@@ -30,7 +30,7 @@ import json
 client = anthropic.Anthropic(api_key="your-api-key")
 
 # Create a metadata encoder
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 # Create a message
 response = client.messages.create(
@@ -90,7 +90,7 @@ metadata = {
 }
 
 # Initialize the streaming handler
-handler = StreamingHandler(metadata=metadata)
+handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 # Create a streaming message
 with client.messages.stream(
@@ -120,7 +120,7 @@ print("\n\nStreaming completed!")
 # Extract and verify the metadata
 from encypher.core import MetadataEncoder
 
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 extracted_metadata = encoder.decode_metadata(full_response)
 verification_result = encoder.verify_text(full_response)
 
@@ -243,7 +243,7 @@ metadata = {
 }
 
 # Embed metadata
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 encoded_text = encoder.encode_metadata(text, metadata)
 
 print("\nFinal response with embedded metadata:")
@@ -302,7 +302,7 @@ app = Flask(__name__)
 client = anthropic.Anthropic(api_key="your-api-key")
 
 # Create a metadata encoder
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -397,7 +397,7 @@ def stream():
     client = anthropic.Anthropic(api_key="your-api-key")
     
     # Initialize the streaming handler
-    handler = StreamingHandler(metadata=metadata)
+    handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
     
     def generate_stream():
         # Create a streaming message

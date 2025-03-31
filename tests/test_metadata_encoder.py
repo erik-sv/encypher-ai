@@ -1,6 +1,7 @@
 """
 Tests for the MetadataEncoder class.
 """
+
 import json
 import time
 from typing import Dict, Any

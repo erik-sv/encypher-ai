@@ -4,7 +4,7 @@ contact_links:
     url: https://docs.encypherai.com
     about: Check our documentation for guides and troubleshooting
   - name: EncypherAI Community Discussions
-    url: https://github.com/erik-sv/encypher_ai/discussions
+    url: https://github.com/encypherai/encypher-ai/discussions
     about: Ask questions and discuss with other community members
   - name: Security Issues
     url: https://www.encypherai.com/security

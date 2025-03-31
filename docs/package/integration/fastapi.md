@@ -11,7 +11,7 @@ Before you begin, make sure you have:
 3. (Optional) An LLM provider API key if you're integrating with an LLM
 
 ```bash
-uv pip install encypher fastapi uvicorn
+uv pip install encypher-ai fastapi uvicorn
 ```
 
 ## Basic Integration
@@ -47,7 +47,7 @@ app.add_middleware(
 )
 
 # Create a metadata encoder
-encoder = MetadataEncoder(secret_key="your-secret-key")  # Use a secure key in production
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 # Define request and response models
 class EncodeRequest(BaseModel):
@@ -124,7 +124,7 @@ async def verify_text(request: VerifyRequest):
         result["metadata"] = metadata
         
         # Verify the text
-        result["verified"] = encoder.verify_text(request.text)
+        result["verified"] = encoder.verify_text(request.text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
     except Exception as e:
         result["error"] = str(e)
     
@@ -142,7 +142,7 @@ async def extract_verified_metadata(request: VerifyRequest):
     
     try:
         # Extract and verify metadata
-        metadata, verified = encoder.extract_verified_metadata(request.text)
+        metadata, verified = encoder.extract_verified_metadata(request.text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
         result["has_metadata"] = True
         result["metadata"] = metadata
         result["verified"] = verified
@@ -193,7 +193,7 @@ async def stream_response(request: StreamRequest):
         metadata["model"] = request.model
     
     # Initialize the streaming handler
-    handler = StreamingHandler(metadata=metadata)
+    handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
     
     # Initialize OpenAI client
     client = openai.OpenAI(api_key="your-api-key")
@@ -348,7 +348,7 @@ async def websocket_endpoint(websocket: WebSocket):
             }
             
             # Initialize the streaming handler
-            handler = StreamingHandler(metadata=metadata)
+            handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
             
             # Initialize OpenAI client
             client = openai.OpenAI(api_key="your-api-key")
@@ -572,7 +572,7 @@ async def generate(request: GenerateRequest):
 
 async def generate_stream(client, request, metadata):
     # Initialize the streaming handler
-    handler = StreamingHandler(metadata=metadata)
+    handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
     
     # Create a streaming completion
     completion = client.chat.completions.create(
@@ -681,7 +681,7 @@ async def generate(request: GenerateRequest):
 
 async def generate_stream(client, request, metadata):
     # Initialize the streaming handler
-    handler = StreamingHandler(metadata=metadata)
+    handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
     
     # Create a streaming message
     with client.messages.stream(
@@ -848,7 +848,7 @@ And a sample `requirements.txt`:
 ```
 fastapi>=0.100.0
 uvicorn>=0.22.0
-encypher>=1.0.0
+encypher-ai>=1.0.0
 python-multipart>=0.0.6
 python-dotenv>=1.0.0
 ```

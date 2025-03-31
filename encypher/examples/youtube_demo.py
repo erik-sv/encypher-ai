@@ -31,6 +31,13 @@ console = Console()
 SECRET_KEY = "demo-secret-key"
 encoder = MetadataEncoder(secret_key=SECRET_KEY)
 
+# Flag to control whether to display encoded text or original text in the terminal
+# Set to True to show original text instead of encoded text with invisible Unicode characters
+DISPLAY_ORIGINAL_TEXT = True
+
+# Flag to show technical byte details in the demo
+SHOW_TECHNICAL_DETAILS = True
+
 
 def clear_screen():
     """Clear the terminal screen."""
@@ -64,6 +71,108 @@ def wait_for_key():
     input()
 
 
+def get_display_text(encoded_text: str, original_text: str) -> str:
+    """Return either the original text or encoded text based on the display flag.
+
+    Args:
+        encoded_text: Text with encoded metadata
+        original_text: Original text without metadata
+
+    Returns:
+        The text to display based on DISPLAY_ORIGINAL_TEXT flag
+    """
+    return original_text if DISPLAY_ORIGINAL_TEXT else encoded_text
+
+
+def format_bytes_for_display(text: str, max_length: int = 30) -> str:
+    """Format the byte representation of text for display.
+
+    Args:
+        text: The text to convert to byte representation
+        max_length: Maximum number of bytes to display
+
+    Returns:
+        A formatted string showing the byte values
+    """
+    # Convert to bytes using UTF-8 encoding
+    byte_values = text.encode("utf-8")
+
+    # Truncate if too long
+    if len(byte_values) > max_length:
+        displayed_bytes = byte_values[:max_length]
+        suffix = f"... ({len(byte_values)} bytes total)"
+    else:
+        displayed_bytes = byte_values
+        suffix = ""
+
+    # Format as hex values
+    hex_values = " ".join(f"{b:02x}" for b in displayed_bytes)
+
+    return f"{hex_values}{suffix}"
+
+
+def show_byte_comparison(original_text: str, encoded_text: str):
+    """Display a technical comparison of byte values between original and encoded text.
+
+    Args:
+        original_text: The original text without metadata
+        encoded_text: The text with encoded metadata
+    """
+    if not SHOW_TECHNICAL_DETAILS:
+        return
+
+    console.print("\n[bold]Technical Details - Byte Comparison:[/bold]")
+
+    # Create a table for byte comparison
+    byte_table = Table(show_header=True, header_style="bold blue")
+    byte_table.add_column("Text Type")
+    byte_table.add_column("Sample (First 10 chars)")
+    byte_table.add_column("UTF-8 Byte Values (Hex)")
+    byte_table.add_column("Length")
+
+    # Original text details
+    original_sample = original_text[:10] + ("..." if len(original_text) > 10 else "")
+    original_bytes = format_bytes_for_display(original_text)
+    original_length = len(original_text)
+
+    # Encoded text details
+    encoded_sample = encoded_text[:10] + ("..." if len(encoded_text) > 10 else "")
+    encoded_bytes = format_bytes_for_display(encoded_text)
+    encoded_length = len(encoded_text)
+
+    # Add rows to the table
+    byte_table.add_row(
+        "Original Text", original_sample, original_bytes, str(original_length)
+    )
+    byte_table.add_row(
+        "Encoded Text", encoded_sample, encoded_bytes, str(encoded_length)
+    )
+
+    # Add a row showing just the invisible characters
+    invisible_chars = "".join(
+        c
+        for c in encoded_text
+        if c in [encoder.ZERO_WIDTH_SPACE, encoder.ZERO_WIDTH_NON_JOINER]
+    )
+    invisible_bytes = format_bytes_for_display(invisible_chars)
+
+    byte_table.add_row(
+        "Invisible Characters Only",
+        f"[dim]{len(invisible_chars)} chars[/dim]",
+        invisible_bytes,
+        str(len(invisible_chars)),
+    )
+
+    console.print(byte_table)
+
+    # Add explanation
+    console.print(
+        "\n[italic]The encoded text contains invisible Unicode characters "
+        "(Zero Width Space: U+200B, Zero Width Non-Joiner: U+200C) that "
+        "store the metadata while remaining visually identical to the original text.[/italic]"
+    )
+
+
 def demo_basic_encoding():
     """Demonstrate basic metadata encoding."""
     print_section("1. Basic Metadata Encoding")
@@ -79,10 +188,13 @@ def demo_basic_encoding():
     readable_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
 
     metadata = {
-        "model_id": "gpt-4",
+        "model_id": "claude-3-opus",
         "timestamp": current_time.isoformat(),
-        "organization": "EncypherAI",
-        "version": "1.0.0",
+        "custom_data": {
+            "user_id": "demo-user",
+            "session_id": "youtube-session-123",
+            "purpose": "demonstration",
+        },
     }
 
     # Display metadata we'll encode
@@ -102,20 +214,30 @@ def demo_basic_encoding():
     time.sleep(1)  # Dramatic pause for demo
 
     encoded_text = encoder.encode_metadata(original_text, metadata)
+    display_text = get_display_text(encoded_text, original_text)
 
     console.print("\nText with encoded metadata:")
-    console.print(Panel(encoded_text, border_style="yellow"))
-    console.print(
-        "\n[italic]The metadata is now invisibly embedded in the text![/italic]"
-    )
+    console.print(Panel(display_text, border_style="yellow"))
+
+    if DISPLAY_ORIGINAL_TEXT:
+        console.print(
+            "\n[italic]The metadata is invisibly embedded in the actual text, but we're showing the original text for better terminal display.[/italic]"
+        )
+    else:
+        console.print(
+            "\n[italic]The metadata is now invisibly embedded in the text![/italic]"
+        )
 
     # Show that the text looks the same
     console.print("\n[bold]Visual comparison:[/bold]")
     comparison = Table(show_header=True)
     comparison.add_column("Original Text")
     comparison.add_column("Text with Metadata")
-    comparison.add_row(original_text, encoded_text)
+    comparison.add_row(original_text, display_text)
     console.print(comparison)
+
+    # Show technical byte comparison
+    show_byte_comparison(original_text, encoded_text)
 
     wait_for_key()
 
@@ -141,10 +263,14 @@ def demo_metadata_extraction():
     }
 
     encoded_text = encoder.encode_metadata(original_text, metadata)
+    display_text = get_display_text(encoded_text, original_text)
 
     # Show the encoded text
     console.print("Text with invisible metadata:")
-    console.print(Panel(encoded_text, border_style="yellow"))
+    console.print(Panel(display_text, border_style="yellow"))
+
+    # Show technical byte comparison
+    show_byte_comparison(original_text, encoded_text)
 
     # Extract and verify metadata
     console.print("\n[bold]Extracting and verifying metadata...[/bold]")
@@ -238,9 +364,13 @@ def demo_tamper_detection():
     time.sleep(1)
 
     encoded_text = encoder.encode_metadata(original_text, metadata)
+    display_text = get_display_text(encoded_text, original_text)
 
     console.print("\n[bold]Text with embedded metadata and HMAC:[/bold]")
-    console.print(Panel(encoded_text, border_style="yellow"))
+    console.print(Panel(display_text, border_style="yellow"))
+
+    # Show technical byte comparison
+    show_byte_comparison(original_text, encoded_text)
 
     # Verify the untampered text
     console.print("\n[bold]Verifying untampered text...[/bold]")
@@ -266,8 +396,9 @@ def demo_tamper_detection():
     # Create a custom tampered text by encoding the new text with the same metadata
     # but then manually replacing the visible part
     tampered_encoded = encoder.encode_metadata(tampered_text, metadata)
+    tampered_display = get_display_text(tampered_encoded, tampered_text)
 
-    console.print(Panel(tampered_encoded, border_style="red"))
+    console.print(Panel(tampered_display, border_style="red"))
 
     # Verify the tampered text - this should now fail because we're using a different approach
     console.print("\n[bold]Verifying tampered text...[/bold]")
@@ -404,6 +535,9 @@ def demo_streaming():
 
     # Process and display chunks
     full_text = ""
+    original_chunks = []
+    encoded_chunks = []
+
     for i, chunk in enumerate(chunks):
         # Process the chunk
         processed_chunk = handler.process_chunk(chunk)
@@ -414,16 +548,64 @@ def demo_streaming():
         else:
             chunk_text = str(processed_chunk)
 
+        # Store the original and encoded chunks for comparison
+        original_chunks.append(chunk)
+        encoded_chunks.append(chunk_text)
+
+        # Use get_display_text to determine what to display
+        display_chunk = get_display_text(chunk_text, chunk)
+
         full_text += chunk_text
 
         # Display progress
         console.print(f"[dim]Chunk {i+1}/{len(chunks)}:[/dim] ", end="")
-        console.print(chunk_text, style="green")
+        console.print(display_chunk, style="green")
 
         time.sleep(0.7)  # Simulate streaming delay
 
+    # Prepare display text for the complete response
+    original_complete_text = "".join(original_chunks)
+    display_full_text = get_display_text(full_text, original_complete_text)
+
     console.print("\n[bold]Complete response with metadata:[/bold]")
-    console.print(Panel(full_text, border_style="yellow"))
+    console.print(Panel(display_full_text, border_style="yellow"))
+
+    # Show technical byte comparison
+    complete_text = "Streaming AI responses is becoming the standard for modern applications. EncypherAI ensures that even streaming content can carry metadata for verification and tracking."
+    encoded_complete_text = encoder.encode_metadata(complete_text, metadata)
+    show_byte_comparison(complete_text, encoded_complete_text)
+
+    # Show streaming-specific byte comparison
+    if SHOW_TECHNICAL_DETAILS:
+        console.print("\n[bold]Technical Details - Streaming Chunks Comparison:[/bold]")
+
+        # Create a table for byte comparison of streaming chunks
+        chunks_table = Table(show_header=True, header_style="bold blue")
+        chunks_table.add_column("Chunk #")
+        chunks_table.add_column("Original Chunk")
+        chunks_table.add_column("Encoded Chunk Bytes (Hex)")
+        chunks_table.add_column("Has Metadata")
+
+        for i, (orig, enc) in enumerate(zip(original_chunks, encoded_chunks)):
+            # Check if this chunk has metadata (by comparing lengths)
+            has_metadata = len(enc) > len(orig)
+
+            # Format bytes for display
+            enc_bytes = format_bytes_for_display(enc, max_length=20)
+
+            chunks_table.add_row(
+                f"Chunk {i+1}/{len(chunks)}",
+                orig,
+                enc_bytes,
+                "✓" if has_metadata else "✗",
+            )
+
+        console.print(chunks_table)
+
+        console.print(
+            "\n[italic]In streaming mode, metadata is typically embedded only in the first chunk "
+            "to minimize overhead while still providing verification capabilities.[/italic]"
+        )
 
     # For demo purposes, let's encode the complete text directly to ensure it works
     console.print("\n[bold]Extracting metadata from streamed text...[/bold]")
@@ -476,44 +658,50 @@ def demo_real_world_use_cases():
 
     use_cases = [
         {
-            "title": "Content Attribution",
-            "description": "Track which AI model generated content, when it was created, and by whom.",
-            "example": "News organizations can verify AI-generated content sources.",
+            "title": "Content Authenticity & Verification",
+            "description": "Embed verifiable metadata that provides indisputable proof of content origin.",
+            "example": "Publishers and content creators can trust the authenticity of their AI-generated work.",
         },
         {
-            "title": "Compliance & Governance",
-            "description": "Embed approval status, review information, and usage permissions.",
-            "example": "Financial institutions can track regulatory compliance of AI outputs.",
+            "title": "Provenance & Audit Trails",
+            "description": "Maintain a complete, immutable record of content history and data lineage.",
+            "example": "Researchers and journalists can track every transformation of their content.",
         },
         {
-            "title": "Data Lineage",
-            "description": "Track data sources and transformations throughout the AI pipeline.",
-            "example": "Research teams can maintain data provenance for scientific integrity.",
+            "title": "Compliance, Transparency & Trust",
+            "description": "Ensure regulatory compliance and clear disclosure of AI content without false alarms.",
+            "example": "Organizations can confidently distinguish between genuine human work and AI-generated text.",
         },
         {
-            "title": "Version Control",
-            "description": "Embed version information, change history, and authorship.",
-            "example": "Software documentation can track which version it corresponds to.",
+            "title": "Digital Rights Management",
+            "description": "Invisibly watermark content to protect intellectual property and verify ownership.",
+            "example": "Media companies can secure their digital assets and prove content provenance.",
         },
         {
-            "title": "Watermarking",
-            "description": "Invisibly watermark AI-generated content for later verification.",
-            "example": "Creative content can be watermarked to verify authenticity.",
+            "title": "Version Control & Document Integrity",
+            "description": "Embed detailed versioning and change history to maintain unaltered, verifiable records.",
+            "example": "Legal and technical documents can be accurately audited over time.",
+        },
+        {
+            "title": "Reliable AI Detection",
+            "description": "Enable platforms to verify AI-generated content with zero false positives or negatives, replacing unreliable prediction models.",
+            "example": "Social media platforms and plagiarism detectors can use our metadata for accurate, real-time verification.",
+        },
+        {
+            "title": "Ethical AI Transparency & Accountability",
+            "description": "Embed verifiable metadata to ensure that AI-generated content is clearly attributable, fostering responsible use and ethical practices",
+            "example": "Organizations, regulators, and the public can trust that content is either genuinely human or verifiably AI-produced, reducing the risk of misuse.",
         },
     ]
 
     # Create a table for use cases
     table = Table(show_header=True, header_style="bold blue", box=box.ROUNDED)
-    table.add_column("Use Case")
+    table.add_column("Use Case", style="bold")
     table.add_column("Description")
-    table.add_column("Example")
+    table.add_column("Example", style="italic")
 
     for case in use_cases:
-        table.add_row(
-            f"[bold]{case['title']}[/bold]",
-            case["description"],
-            f"[italic]{case['example']}[/italic]",
-        )
+        table.add_row(case["title"], case["description"], case["example"])
 
     console.print(table)
 
@@ -535,11 +723,11 @@ def demo_conclusion():
 
     ## Documentation
 
-    Visit our documentation at [https://docs.encypherai.com](https://docs.encypherai.com)
+    Visit our documentation at https://docs.encypherai.com
 
     ## GitHub Repository
 
-    Star us on GitHub: [https://github.com/your-organization/encypher](https://github.com/your-organization/encypher)
+    Star us on GitHub: https://github.com/encypherai/encypher-ai
 
     ## Community
 

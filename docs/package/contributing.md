@@ -11,8 +11,8 @@ All contributors are expected to adhere to our Code of Conduct. Please read it b
 1. **Fork the repository**
 2. **Clone your fork**
    ```bash
-   git clone https://github.com/your-username/encypher_ai.git
-   cd encypher_ai
+   git clone https://github.com/your-username/encypher-ai.git
+   cd encypher-ai
    ```
 3. **Set up the development environment**
    ```bash

@@ -1,6 +1,7 @@
 """
 Tests for the StreamingHandler class.
 """
+
 import json
 from datetime import datetime, timezone
 
@@ -36,7 +37,10 @@ class TestStreamingHandler:
         assert extracted_metadata.get("model_id") == metadata["model_id"]
         # Compare timestamps ignoring microseconds
         assert isinstance(extracted_metadata.get("timestamp"), datetime)
-        assert int(extracted_metadata.get("timestamp").timestamp()) == metadata["timestamp"]
+        assert (
+            int(extracted_metadata.get("timestamp").timestamp())
+            == metadata["timestamp"]
+        )
 
     def test_encode_first_chunk_only(self):
         """Test encoding only the first chunk."""
@@ -99,7 +103,10 @@ class TestStreamingHandler:
             assert extracted_metadata.get("model_id") == metadata["model_id"]
             # Compare timestamps ignoring microseconds
             assert isinstance(extracted_metadata.get("timestamp"), datetime)
-            assert int(extracted_metadata.get("timestamp").timestamp()) == metadata["timestamp"]
+            assert (
+                int(extracted_metadata.get("timestamp").timestamp())
+                == metadata["timestamp"]
+            )
 
     def test_process_dict_chunk_openai(self):
         """Test processing an OpenAI-style dictionary chunk."""
@@ -173,7 +180,10 @@ class TestStreamingHandler:
         assert extracted_metadata.get("model_id") == metadata["model_id"]
         # Compare timestamps ignoring microseconds
         assert isinstance(extracted_metadata.get("timestamp"), datetime)
-        assert int(extracted_metadata.get("timestamp").timestamp()) == metadata["timestamp"]
+        assert (
+            int(extracted_metadata.get("timestamp").timestamp())
+            == metadata["timestamp"]
+        )
 
     def test_reset(self):
         """Test resetting the handler."""

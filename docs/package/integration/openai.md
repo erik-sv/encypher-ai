@@ -11,7 +11,7 @@ Before you begin, make sure you have:
 3. EncypherAI installed
 
 ```bash
-uv pip install encypher openai
+uv pip install encypher-ai openai
 ```
 
 ## Basic Integration
@@ -30,7 +30,7 @@ import json
 client = openai.OpenAI(api_key="your-api-key")
 
 # Create a metadata encoder
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 # Create a completion
 response = client.chat.completions.create(
@@ -64,7 +64,7 @@ print(encoded_text)
 
 # Later, extract and verify the metadata
 extracted_metadata = encoder.decode_metadata(encoded_text)
-verification_result = encoder.verify_text(encoded_text)
+verification_result = encoder.verify_text(encoded_text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
@@ -91,7 +91,7 @@ metadata = {
 }
 
 # Initialize the streaming handler
-handler = StreamingHandler(metadata=metadata)
+handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 # Create a streaming completion
 completion = client.chat.completions.create(
@@ -124,9 +124,9 @@ print("\n\nStreaming completed!")
 # Extract and verify the metadata
 from encypher.core import MetadataEncoder
 
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 extracted_metadata = encoder.decode_metadata(full_response)
-verification_result = encoder.verify_text(full_response)
+verification_result = encoder.verify_text(full_response, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
@@ -239,7 +239,7 @@ metadata = {
 }
 
 # Embed metadata
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 encoded_text = encoder.encode_metadata(text, metadata)
 
 print("\nFinal response with embedded metadata:")
@@ -295,7 +295,7 @@ app = Flask(__name__)
 client = openai.OpenAI(api_key="your-api-key")
 
 # Create a metadata encoder
-encoder = MetadataEncoder()
+encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
 
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -344,7 +344,7 @@ def verify():
     # Extract and verify metadata
     try:
         metadata = encoder.decode_metadata(text)
-        verified = encoder.verify_text(text)
+        verified = encoder.verify_text(text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
         
         return jsonify({
             "has_metadata": True,
@@ -391,7 +391,7 @@ def stream():
     client = openai.OpenAI(api_key="your-api-key")
     
     # Initialize the streaming handler
-    handler = StreamingHandler(metadata=metadata)
+    handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
     
     def generate_stream():
         # Create a streaming completion

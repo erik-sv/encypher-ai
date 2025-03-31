@@ -1,6 +1,7 @@
 """
 Tests for the UnicodeMetadata class.
 """
+
 import json
 import time
 from datetime import datetime, timezone
@@ -50,7 +51,9 @@ class TestUnicodeMetadata:
             assert metadata.get("model_id") == model_id
             # Verify the timestamp is a datetime object with the correct value
             assert isinstance(metadata.get("timestamp"), datetime)
-            assert metadata.get("timestamp").replace(microsecond=0) == test_dt.replace(microsecond=0)
+            assert metadata.get("timestamp").replace(microsecond=0) == test_dt.replace(
+                microsecond=0
+            )
 
     def test_custom_metadata(self):
         """Test embedding and extracting custom metadata."""

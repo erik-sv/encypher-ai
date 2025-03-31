@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 
 ## Environment
 - OS: [e.g. Windows 10, Ubuntu 22.04]
-- Python Version: [e.g. 3.8.10]
+- Python Version: [e.g. 3.9.10]
 - EncypherAI Version: [e.g. 1.0.0]
 - LLM Provider: [e.g. OpenAI, Anthropic]
 - LiteLLM Version: [e.g. 1.30.3]

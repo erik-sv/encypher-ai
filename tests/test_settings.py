@@ -1,6 +1,7 @@
 """
 Tests for the Settings class.
 """
+
 import os
 import json
 import tempfile
