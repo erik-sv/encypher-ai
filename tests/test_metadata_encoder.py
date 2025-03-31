@@ -16,7 +16,7 @@ class TestMetadataEncoder:
 
     def test_encode_decode_metadata(self):
         """Test encoding and decoding metadata."""
-        encoder = MetadataEncoder(secret_key="test-secret")
+        encoder = MetadataEncoder(hmac_secret_key="test-secret")
         text = "This is a test text."
         metadata = {
             "model_id": "test-model",
@@ -44,7 +44,7 @@ class TestMetadataEncoder:
 
     def test_verify_text(self):
         """Test verifying text with metadata."""
-        encoder = MetadataEncoder(secret_key="test-secret")
+        encoder = MetadataEncoder(hmac_secret_key="test-secret")
         text = "This is a test text."
         metadata = {"model_id": "test-model", "timestamp": int(time.time())}
 
@@ -65,8 +65,8 @@ class TestMetadataEncoder:
     def test_invalid_hmac(self):
         """Test with invalid HMAC."""
         # Create two encoders with different secret keys
-        encoder1 = MetadataEncoder(secret_key="secret1")
-        encoder2 = MetadataEncoder(secret_key="secret2")
+        encoder1 = MetadataEncoder(hmac_secret_key="secret1")
+        encoder2 = MetadataEncoder(hmac_secret_key="secret2")
 
         text = "This is a test text."
         metadata = {"model_id": "test-model", "timestamp": int(time.time())}
@@ -99,7 +99,7 @@ class TestMetadataEncoder:
 
     def test_empty_text(self):
         """Test with empty text."""
-        encoder = MetadataEncoder()
+        encoder = MetadataEncoder(hmac_secret_key="test-secret")
         text = ""
         metadata = {"model_id": "test-model", "timestamp": int(time.time())}
 
@@ -108,15 +108,20 @@ class TestMetadataEncoder:
 
         # Ensure the text is modified (metadata added)
         assert encoded_text != text
+        assert len(encoded_text) > 0
 
         # Decode metadata
         extracted_metadata, clean_text = encoder.decode_metadata(encoded_text)
 
         # Verify extracted metadata
-        assert extracted_metadata is not None
+        assert (
+            extracted_metadata is not None
+        ), "Metadata should be extracted even from empty text"
         assert extracted_metadata.get("model_id") == metadata["model_id"]
-        # Fix: Compare integers directly
         assert int(extracted_metadata.get("timestamp")) == metadata["timestamp"]
+
+        # Verify clean text
+        assert clean_text == text
 
     def test_no_metadata(self):
         """Test decoding text without metadata."""

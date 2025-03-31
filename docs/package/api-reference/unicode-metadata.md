@@ -142,6 +142,49 @@ def extract_bytes(cls, text: str) -> bytes:
     """
 ```
 
+### embed_metadata
+
+```python
+@classmethod
+def embed_metadata(
+    cls, 
+    text: str, 
+    model_id: str, 
+    timestamp: int, 
+    custom_metadata: Dict[str, Any] = {}, 
+    hmac_secret_key: Optional[str] = None
+) -> Tuple[str, bool]:
+    """
+    Embed metadata into text using Unicode variation selectors.
+    
+    Args:
+        text: The text to embed metadata into
+        model_id: Model identifier
+        timestamp: Unix/Epoch timestamp
+        custom_metadata: Additional metadata to embed
+        hmac_secret_key: Optional HMAC secret key for verification
+        
+    Returns:
+        Tuple containing the encoded text and a boolean indicating whether the embedding was successful
+    """
+```
+
+### extract_metadata
+
+```python
+@classmethod
+def extract_metadata(cls, text: str) -> Tuple[Dict[str, Any], bool]:
+    """
+    Extract metadata embedded in text using Unicode variation selectors.
+    
+    Args:
+        text: Text with embedded metadata
+        
+    Returns:
+        Tuple containing the extracted metadata and a boolean indicating whether the extraction was successful
+    """
+```
+
 ## MetadataTarget Enum
 
 The `MetadataTarget` enum defines the possible targets for embedding metadata:
@@ -174,18 +217,34 @@ punctuation_targets = UnicodeMetadata.find_targets(text, MetadataTarget.PUNCTUAT
 print(f"Whitespace targets: {len(whitespace_targets)} positions")
 print(f"Punctuation targets: {len(punctuation_targets)} positions")
 
-# Embed binary data
-data = b"Hello, world!"
-encoded_text = UnicodeMetadata.embed_bytes(text, data, MetadataTarget.WHITESPACE)
+# Embed metadata
+metadata = {
+    "model_id": "gpt-4",
+    "timestamp": int(time.time()),  # Unix/Epoch timestamp
+    "version": "1.0.0"
+}
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    model_id=metadata["model_id"],
+    timestamp=metadata["timestamp"],
+    custom_metadata={"version": metadata["version"]},
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
+)
 
 print("\nOriginal text:")
 print(text)
 print("\nEncoded text (looks identical but contains embedded data):")
 print(encoded_text)
 
-# Extract the embedded data
-extracted_data = UnicodeMetadata.extract_bytes(encoded_text)
-print(f"\nExtracted data: {extracted_data.decode('utf-8')}")
+# Extract the metadata
+extracted_metadata = UnicodeMetadata.extract_metadata(encoded_text)
+print(f"\nExtracted metadata: {extracted_metadata}")
+
+# If you used an HMAC secret key and want to verify the metadata
+from encypher.core.metadata_encoder import MetadataEncoder
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
+metadata_dict, is_verified = encoder.extract_verified_metadata(encoded_text)
+print(f"\nVerified: {is_verified}")
 
 # Demonstrate variation selector conversion
 byte_value = 65  # ASCII 'A'

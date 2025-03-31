@@ -34,7 +34,7 @@ os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
 os.environ["ANTHROPIC_API_KEY"] = "your-anthropic-api-key"
 
 # Create a metadata encoder
-encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")  # Optional: hmac_secret_key is only needed if you want HMAC verification
 
 # Create a completion using OpenAI
 response = litellm.completion(
@@ -68,12 +68,12 @@ print("\nResponse with embedded metadata:")
 print(encoded_text)
 
 # Later, extract and verify the metadata
-extracted_metadata = encoder.decode_metadata(encoded_text)
-verification_result = encoder.verify_text(encoded_text, secret_key="your-secret-key")
+extracted_metadata, clean_text = encoder.decode_metadata(encoded_text)
+is_verified = encoder.verify_text(encoded_text)
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(f"Verification result: {'✅ Verified' if is_verified else '❌ Failed'}")
 ```
 
 ### Streaming Response
@@ -99,7 +99,12 @@ metadata = {
 }
 
 # Initialize the streaming handler
-handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
+handler = StreamingHandler(
+    metadata=metadata,
+    target="whitespace",
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
+)
 
 # Create a streaming completion
 response = litellm.completion(
@@ -132,13 +137,13 @@ print("\n\nStreaming completed!")
 # Extract and verify the metadata
 from encypher.core import MetadataEncoder
 
-encoder = MetadataEncoder(secret_key="your-secret-key")
-extracted_metadata = encoder.decode_metadata(full_response)
-verification_result = encoder.verify_text(full_response, secret_key="your-secret-key")
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
+extracted_metadata, clean_text = encoder.decode_metadata(full_response)
+is_verified = encoder.verify_text(full_response)
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(f"Verification result: {'✅ Verified' if is_verified else '❌ Failed'}")
 ```
 
 ## Advanced Integration
@@ -159,7 +164,7 @@ os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
 os.environ["ANTHROPIC_API_KEY"] = "your-anthropic-api-key"
 
 # Create a metadata encoder
-encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")  # Optional: hmac_secret_key is only needed if you want HMAC verification
 
 # Function to generate text with metadata using any LLM provider
 def generate_with_metadata(model, prompt, system_prompt=None):
@@ -339,7 +344,7 @@ if hasattr(response, "usage"):
     })
 
 # Embed metadata
-encoder = MetadataEncoder(secret_key="your-secret-key")
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
 encoded_text = encoder.encode_metadata(text, metadata)
 
 print("\nFinal response with embedded metadata:")
@@ -360,7 +365,7 @@ import json
 
 app = FastAPI()
 security = HTTPBearer()
-encoder = MetadataEncoder(secret_key="your-secret-key")
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
 
 # Add LiteLLM router
 app.include_router(litellm_router)
@@ -431,8 +436,8 @@ async def verify(request: Request):
     
     # Extract and verify metadata
     try:
-        metadata = encoder.decode_metadata(text)
-        verified = encoder.verify_text(text, secret_key="your-secret-key")
+        metadata, clean_text = encoder.decode_metadata(text)
+        verified = encoder.verify_text(text)
         
         return {
             "has_metadata": True,
@@ -471,7 +476,12 @@ metadata = {
 }
 
 # Initialize the streaming handler
-handler = StreamingHandler(metadata=metadata, secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
+handler = StreamingHandler(
+    metadata=metadata,
+    target="whitespace",
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
+)
 
 # Create a streaming completion
 response = litellm.completion(

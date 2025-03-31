@@ -265,3 +265,132 @@ The HMAC signature is calculated based on the entire content, not just individua
 - [`MetadataEncoder`](./metadata-encoder.md) - Base class for embedding and extracting metadata
 - [`StreamingHandler`](../streaming/handlers.md) - Higher-level interface for streaming scenarios
 - [`UnicodeMetadata`](./unicode-metadata.md) - Low-level utilities for working with Unicode variation selectors
+
+## StreamingHandler
+
+The `StreamingHandler` class provides specialized functionality for embedding metadata in streaming content, such as text generated chunk by chunk from an LLM.
+
+## Overview
+
+When working with streaming content, embedding metadata presents unique challenges:
+
+1. The content arrives in chunks, not all at once
+2. Each chunk may not have suitable locations for embedding metadata
+3. The metadata must be consistently verifiable across the entire content
+
+The `StreamingHandler` addresses these challenges by:
+
+- Buffering content as needed
+- Intelligently distributing metadata across chunks
+- Ensuring HMAC verification works on the complete content
+
+## Class Definition
+
+```python
+class StreamingHandler:
+    def __init__(
+        self,
+        metadata: Optional[Dict[str, Any]] = None,
+        target: Union[str, MetadataTarget] = "whitespace",
+        encode_first_chunk_only: bool = True,
+        hmac_secret_key: Optional[str] = None
+    ):
+        """
+        Initialize a StreamingHandler for handling streaming content.
+        
+        Args:
+            metadata: Dictionary containing the metadata to embed
+            target: Where to embed metadata. Can be a string ("whitespace", "punctuation", 
+                   "first_letter", "last_letter", "all_characters") or a MetadataTarget enum.
+            encode_first_chunk_only: If True, metadata will only be embedded in the first
+                                    non-empty chunk that contains suitable targets.
+            hmac_secret_key: Optional secret key for HMAC verification. Only needed if
+                            you want to verify the integrity of the metadata.
+        """
+```
+
+## Methods
+
+### process_chunk
+
+```python
+def process_chunk(
+    self, 
+    chunk: Union[str, Dict[str, Any]]
+) -> Union[str, Dict[str, Any]]:
+    """
+    Process a chunk of streaming content.
+    
+    Args:
+        chunk: The text chunk to process or a dictionary containing a text chunk
+        
+    Returns:
+        The processed chunk with metadata embedded (if applicable)
+    """
+```
+
+### finalize
+
+```python
+def finalize(self) -> Optional[str]:
+    """
+    Finalize the streaming process.
+    
+    This method should be called after all chunks have been processed to ensure
+    that any remaining buffered content is properly processed.
+    
+    Returns:
+        Any remaining processed content, or None if there is none
+    """
+```
+
+## Usage Example
+
+```python
+from encypher.streaming.handlers import StreamingHandler
+import time
+
+# Create metadata
+metadata = {
+    "model_id": "gpt-4",
+    "organization": "EncypherAI",
+    "timestamp": int(time.time()),  # Unix/Epoch timestamp
+    "version": "1.0.0"
+}
+
+# Initialize the streaming handler
+handler = StreamingHandler(
+    metadata=metadata,
+    target="whitespace",
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
+)
+
+# Process chunks as they arrive
+chunks = [
+    "This is the first chunk of text. ",
+    "This is the second chunk. ",
+    "And this is the final chunk."
+]
+
+full_text = ""
+for chunk in chunks:
+    # Process the chunk
+    processed_chunk = handler.process_chunk(chunk=chunk)
+    
+    # Print and accumulate the processed chunk
+    print(processed_chunk, end="", flush=True)
+    full_text += processed_chunk
+
+# Finalize the stream
+final_chunk = handler.finalize()
+if final_chunk:
+    full_text += final_chunk
+
+# Extract and verify the metadata
+from encypher.core.metadata_encoder import MetadataEncoder
+
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
+metadata_dict, is_verified = encoder.extract_verified_metadata(full_text)
+print(f"\nMetadata: {metadata_dict}")
+print(f"Verified: {is_verified}")

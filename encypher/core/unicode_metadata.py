@@ -7,9 +7,12 @@ into text using Unicode variation selectors without affecting readability.
 
 import re
 import json
+import hmac
+import hashlib
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union, Any
+import zlib
 
 
 class MetadataTarget(Enum):
@@ -145,6 +148,41 @@ class UnicodeMetadata:
             return ""
 
     @classmethod
+    def extract_bytes(cls, text: str) -> bytes:
+        """
+        Extract bytes from Unicode variation selectors
+
+        Args:
+            text: Text with embedded variation selectors
+
+        Returns:
+            Bytes extracted from variation selectors
+        """
+        # Extract bytes from variation selectors
+        decoded: List[int] = []
+
+        for char in text:
+            code_point = ord(char)
+            byte = cls.from_variation_selector(code_point)
+
+            # If we've found a non-variation selector after we've started collecting bytes,
+            # we're done
+            if byte is None and len(decoded) > 0:
+                break
+            # If it's not a variation selector and we haven't started collecting bytes yet,
+            # it's probably the base character (emoji), so skip it
+            elif byte is None:
+                continue
+
+            decoded.append(byte)
+
+        # Convert bytes back to bytes object
+        if decoded:
+            return bytes(decoded)
+        else:
+            return b""
+
+    @classmethod
     def embed_metadata(
         cls,
         text: str,
@@ -152,6 +190,8 @@ class UnicodeMetadata:
         timestamp: Optional[Union[str, datetime, int, float]] = None,
         target: Optional[Union[str, MetadataTarget]] = None,
         custom_metadata: Optional[Dict[str, Any]] = None,
+        hmac_secret_key: Optional[str] = None,
+        **kwargs: Any,
     ) -> str:
         """
         Embed model and timestamp metadata into text using Unicode variation selectors.
@@ -162,6 +202,8 @@ class UnicodeMetadata:
             timestamp: The timestamp to embed (can be a string, datetime object, or Unix timestamp)
             target: Where to embed the metadata (whitespace, punctuation, first_letter, last_letter, all_characters)
             custom_metadata: Additional custom metadata to embed
+            hmac_secret_key: Optional secret key for HMAC verification
+            **kwargs: Additional metadata fields to include
 
         Returns:
             Text with embedded metadata
@@ -200,8 +242,26 @@ class UnicodeMetadata:
         if custom_metadata:
             metadata.update(custom_metadata)
 
+        # Add any additional kwargs as metadata
+        if kwargs:
+            metadata.update(kwargs)
+
         # Convert metadata to JSON string
         json_str = json.dumps(metadata, separators=(",", ":"))
+
+        # Add HMAC if secret key is provided
+        if hmac_secret_key:
+            # Create HMAC signature
+            signature = hmac.new(
+                hmac_secret_key.encode("utf-8"),
+                json_str.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+
+            # Add signature to metadata
+            json_str = json.dumps(
+                {"data": metadata, "signature": signature}, separators=(",", ":")
+            )
 
         # Map string target to enum value if needed
         if isinstance(target, str):
@@ -257,50 +317,137 @@ class UnicodeMetadata:
         return "".join(result)
 
     @classmethod
-    def extract_metadata(cls, text: str) -> Dict[str, Union[str, datetime, Any]]:
+    def extract_metadata(cls, text: str) -> Dict[str, Any]:
         """
-        Extract metadata from text with embedded Unicode variation selectors
+        Extract metadata from text with embedded Unicode variation selectors.
 
         Args:
             text: Text with embedded metadata
 
         Returns:
-            Dictionary with extracted metadata (model_id, timestamp, and any custom fields)
+            Dictionary containing the extracted metadata
         """
-        # Extract the raw JSON metadata
-        raw_metadata = cls.decode(text)
-        if not raw_metadata:
-            # Return empty dictionary with default values for expected fields
+        # Extract bytes from text
+        data_bytes = cls.extract_bytes(text)
+        if not data_bytes:
             return {"model_id": "", "timestamp": None}
 
         try:
-            metadata: Dict[str, Union[str, datetime, Any]] = json.loads(raw_metadata)
+            # Parse JSON
+            try:
+                # Check if this is HMAC-signed metadata (has data and signature fields)
+                parsed_json = json.loads(data_bytes.decode("utf-8"))
+                if (
+                    isinstance(parsed_json, dict)
+                    and "data" in parsed_json
+                    and "signature" in parsed_json
+                ):
+                    # This is signed data, extract just the data portion
+                    metadata: Dict[str, Any] = parsed_json["data"]
+                else:
+                    # Regular metadata
+                    metadata = parsed_json
 
-            # Ensure model_id has a default empty string if not present
-            if "model_id" not in metadata:
-                metadata["model_id"] = ""
+                # Ensure model_id has a default empty string if not present
+                if "model_id" not in metadata:
+                    metadata["model_id"] = ""
 
-            # Handle timestamp conversion if present
-            if "timestamp" in metadata:
-                if isinstance(metadata["timestamp"], (int, float)):
-                    # Convert Unix timestamp to datetime
-                    try:
+                # Handle timestamp conversion if present
+                if "timestamp" in metadata:
+                    if isinstance(metadata["timestamp"], (int, float)):
+                        # Convert Unix timestamp to datetime
                         metadata["timestamp"] = datetime.fromtimestamp(
                             metadata["timestamp"], tz=timezone.utc
                         )
-                    except (ValueError, TypeError, OverflowError):
-                        # If conversion fails, leave as is
-                        pass
-                elif isinstance(metadata["timestamp"], str):
-                    try:
-                        # Try to parse as ISO format
-                        metadata["timestamp"] = datetime.fromisoformat(
-                            metadata["timestamp"].replace("Z", "+00:00")
-                        )
-                    except (ValueError, TypeError):
-                        # If parsing fails, leave as string
-                        pass
+                    elif isinstance(metadata["timestamp"], str):
+                        # Try to parse ISO format
+                        try:
+                            metadata["timestamp"] = datetime.fromisoformat(
+                                metadata["timestamp"].replace("Z", "+00:00")
+                            )
+                        except ValueError:
+                            # If parsing fails, leave as is
+                            pass
 
-            return metadata
-        except json.JSONDecodeError:
+                return metadata
+            except json.JSONDecodeError:
+                return {"model_id": "", "timestamp": None}
+        except Exception:
             return {"model_id": "", "timestamp": None}
+
+    @classmethod
+    def verify_metadata(
+        cls, text: str, hmac_secret_key: str
+    ) -> Tuple[Dict[str, Any], bool]:
+        """
+        Verify and extract metadata from text with HMAC verification.
+
+        Args:
+            text: Text with embedded metadata
+            hmac_secret_key: Secret key used for HMAC verification
+
+        Returns:
+            Tuple of (metadata, is_verified) where is_verified is True if
+            the HMAC signature is valid
+        """
+        if not hmac_secret_key:
+            return cls.extract_metadata(text), False
+
+        # Extract bytes from text
+        raw_metadata = cls.extract_bytes(text)
+        if not raw_metadata:
+            return {"model_id": "", "timestamp": None}, False
+
+        try:
+            parsed_json = json.loads(raw_metadata.decode("utf-8"))
+
+            # Check if this is HMAC-signed metadata
+            if (
+                isinstance(parsed_json, dict)
+                and "data" in parsed_json
+                and "signature" in parsed_json
+            ):
+                data = parsed_json["data"]
+                signature = parsed_json["signature"]
+
+                # Verify the signature
+                data_json = json.dumps(data, separators=(",", ":"))
+                expected_signature = hmac.new(
+                    hmac_secret_key.encode("utf-8"),
+                    data_json.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+
+                # Compare signatures
+                is_verified = hmac.compare_digest(signature, expected_signature)
+
+                # Process the metadata (same as in extract_metadata)
+                metadata = data
+
+                # Ensure model_id has a default empty string if not present
+                if "model_id" not in metadata:
+                    metadata["model_id"] = ""
+
+                # Handle timestamp conversion if present
+                if "timestamp" in metadata:
+                    if isinstance(metadata["timestamp"], (int, float)):
+                        metadata["timestamp"] = datetime.fromtimestamp(
+                            metadata["timestamp"], tz=timezone.utc
+                        )
+                    elif isinstance(metadata["timestamp"], str):
+                        try:
+                            metadata["timestamp"] = datetime.fromisoformat(
+                                metadata["timestamp"].replace("Z", "+00:00")
+                            )
+                        except ValueError:
+                            # If parsing fails, leave as is
+                            pass
+
+                return metadata, is_verified
+            else:
+                # Not signed data, return the metadata but verification is False
+                return cls.extract_metadata(text), False
+
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # If any error occurs during parsing, return empty metadata and False
+            return {"model_id": "", "timestamp": None}, False

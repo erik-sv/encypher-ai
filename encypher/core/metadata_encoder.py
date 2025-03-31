@@ -34,14 +34,14 @@ class MetadataEncoder:
     # Signature marker to identify encoded content
     SIGNATURE = "EAIM"  # EncypherAI Metadata
 
-    def __init__(self, secret_key: str = ""):
+    def __init__(self, hmac_secret_key: Optional[str] = None):
         """
         Initialize the encoder with a secret key for HMAC verification.
 
         Args:
-            secret_key: Secret key used for HMAC verification
+            hmac_secret_key: Optional secret key used for HMAC verification
         """
-        self.secret_key = secret_key
+        self.hmac_secret_key = hmac_secret_key
 
     def _bytes_to_zwc(self, data: bytes) -> str:
         """
@@ -102,21 +102,26 @@ class MetadataEncoder:
 
         return bytes(result)
 
-    def _create_hmac(self, data: bytes) -> bytes:
+    def _create_hmac(self, data_bytes: bytes) -> str:
         """
-        Create HMAC for data verification.
+        Create an HMAC signature for the given data.
 
         Args:
-            data: Data to create HMAC for
+            data_bytes: The data to sign
 
         Returns:
-            HMAC digest
+            HMAC signature as a hex string
         """
-        return hmac.new(self.secret_key.encode(), data, hashlib.sha256).digest()[
-            :8
-        ]  # Use first 8 bytes of HMAC for compactness
+        if self.hmac_secret_key is None:
+            return ""
 
-    def _verify_hmac(self, data: bytes, signature: bytes) -> bool:
+        return hmac.new(
+            self.hmac_secret_key.encode("utf-8"),
+            data_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _verify_hmac(self, data: bytes, signature: str) -> bool:
         """
         Verify HMAC signature.
 
@@ -156,7 +161,7 @@ class MetadataEncoder:
         signature_bytes = self.SIGNATURE.encode("utf-8")
 
         # Combine all bytes
-        combined = signature_bytes + hmac_digest + metadata_bytes
+        combined = signature_bytes + hmac_digest.encode("utf-8") + metadata_bytes
 
         # Convert to base64 first for efficiency
         b64_data = base64.b64encode(combined)
@@ -176,25 +181,34 @@ class MetadataEncoder:
             text: Text that may contain encoded metadata
 
         Returns:
-            Tuple of (metadata dict or None if not found/invalid, clean text)
+            Tuple of (metadata, clean_text) where metadata is None if no metadata was found
         """
-        # Extract zero-width characters
-        zwc_chars = "".join(
-            c for c in text if c in (self.ZERO_WIDTH_SPACE, self.ZERO_WIDTH_NON_JOINER)
-        )
+        # Handle empty or very short text
+        if not text:
+            return None, text
 
+        # Extract zero-width characters
+        zwc_chars = ""
+        clean_chars = []
+
+        for char in text:
+            if char in (self.ZERO_WIDTH_SPACE, self.ZERO_WIDTH_NON_JOINER):
+                zwc_chars += char
+            else:
+                clean_chars.append(char)
+
+        # If no zero-width characters found, return None
         if not zwc_chars:
             return None, text
 
-        # Convert ZWC to bytes
+        # Convert zero-width characters back to bytes
         try:
             b64_data = self._zwc_to_bytes(zwc_chars)
             combined = base64.b64decode(b64_data)
         except Exception:
-            # If decoding fails, return original text
             return None, text
 
-        # Check for signature marker
+        # Check signature
         sig_len = len(self.SIGNATURE)
         if (
             len(combined) < sig_len
@@ -204,37 +218,69 @@ class MetadataEncoder:
 
         # Extract parts
         signature_offset = sig_len
-        hmac_offset = signature_offset + 8
+        hmac_offset = signature_offset + 64  # Changed from 8 to 64
 
         signature = combined[signature_offset:hmac_offset]
         metadata_bytes = combined[hmac_offset:]
 
         # Verify HMAC
-        if not self._verify_hmac(metadata_bytes, signature):
+        if not self._verify_hmac(metadata_bytes, signature.decode("utf-8")):
             return None, text
 
         # Decode metadata JSON
         try:
-            metadata = json.loads(metadata_bytes.decode("utf-8"))
-            # Remove all ZWC from text to get clean text
-            clean_text = "".join(
-                c
-                for c in text
-                if c not in (self.ZERO_WIDTH_SPACE, self.ZERO_WIDTH_NON_JOINER)
-            )
-            return metadata, clean_text
+            metadata_json = metadata_bytes.decode("utf-8")
+            metadata = json.loads(metadata_json)
+            return metadata, "".join(clean_chars)
         except json.JSONDecodeError:
             return None, text
 
-    def verify_text(self, text: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+    def verify_text(
+        self, text: str, hmac_secret_key: Optional[str] = None
+    ) -> Tuple[bool, Optional[Dict[str, Any]], str]:
         """
-        Verify if text contains valid encoded metadata.
+        Verify the integrity of text with embedded metadata using HMAC.
 
         Args:
-            text: Text to verify
+            text: Text with embedded metadata
+            hmac_secret_key: Optional secret key to override the instance's key
 
         Returns:
             Tuple of (is_valid, metadata if valid else None, clean text)
         """
+        # Use provided key or instance key
+        key = hmac_secret_key or self.hmac_secret_key
+
+        # If no key is available, we can't verify
+        if not key:
+            return False, None, text
+
+        # Use instance's decode_metadata method
         metadata, clean_text = self.decode_metadata(text)
         return metadata is not None, metadata, clean_text
+
+    def extract_verified_metadata(
+        self, text: str, hmac_secret_key: Optional[str] = None
+    ) -> Tuple[Dict[str, Any], bool]:
+        """
+        Extract metadata from text and verify its integrity using HMAC.
+
+        Args:
+            text: Text with embedded metadata
+            hmac_secret_key: Optional HMAC secret key for verification
+
+        Returns:
+            Tuple containing the extracted metadata and a boolean indicating
+            whether the metadata was successfully verified
+        """
+        # Use provided key or instance key
+        key = hmac_secret_key or self.hmac_secret_key
+
+        # If no key is available, extract without verification
+        if not key:
+            metadata, _ = self.decode_metadata(text)
+            return metadata or {"model_id": "", "timestamp": None}, False
+
+        # Use instance's verify_text method
+        is_valid, metadata, _ = self.verify_text(text, key)
+        return metadata or {"model_id": "", "timestamp": None}, is_valid

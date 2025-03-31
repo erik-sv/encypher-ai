@@ -6,12 +6,12 @@ The `MetadataEncoder` class is the primary interface for embedding and extractin
 
 ```python
 class MetadataEncoder:
-    def __init__(self, secret_key: Optional[str] = None):
+    def __init__(self, hmac_secret_key: Optional[str] = None):
         """
         Initialize a MetadataEncoder instance.
         
         Args:
-            secret_key: Secret key for HMAC verification. If None, HMAC verification is disabled.
+            hmac_secret_key: Optional secret key for HMAC verification. If None, HMAC verification is disabled.
         """
 ```
 
@@ -90,7 +90,7 @@ from encypher.core.metadata_encoder import MetadataEncoder
 import time
 
 # Initialize with a secret key for HMAC verification
-encoder = MetadataEncoder(secret_key="your-secret-key")
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
 
 # Define metadata
 metadata = {
@@ -176,7 +176,7 @@ import hashlib
 class CustomEncoder(MetadataEncoder):
     def _create_hmac(self, data_bytes: bytes) -> str:
         return hmac.new(
-            self.secret_key.encode('utf-8'),
+            self.hmac_secret_key.encode('utf-8'),
             data_bytes,
             hashlib.sha512  # Use SHA-512 instead of SHA-256
         ).hexdigest()

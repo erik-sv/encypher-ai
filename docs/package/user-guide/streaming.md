@@ -33,7 +33,8 @@ metadata = {
 handler = StreamingHandler(
     metadata=metadata,
     target="whitespace",  # Where to embed metadata
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 
 # Process chunks as they arrive
@@ -58,15 +59,19 @@ full_text = "".join(processed_chunks)
 from encypher.core.metadata_encoder import MetadataEncoder
 from encypher.core.unicode_metadata import UnicodeMetadata
 
-# Extract metadata
-is_valid, extracted_metadata = UnicodeMetadata.extract_metadata(full_text)
-print(f"Metadata extraction successful: {is_valid}")
+# Extract metadata without verification
+extracted_metadata = UnicodeMetadata.extract_metadata(full_text)
 print(f"Extracted metadata: {extracted_metadata}")
 
-# Verify with encoder if needed
-encoder = MetadataEncoder()
-is_valid, metadata_dict, clean_text = encoder.verify_text(full_text)
+# For verification with HMAC
+encoder = MetadataEncoder(hmac_secret_key="your-secret-key")  # Use the same secret key as above
+is_valid = encoder.verify_text(full_text)
 print(f"Verification result: {is_valid}")
+
+# Or extract and verify in one step
+metadata_dict, is_verified = encoder.extract_verified_metadata(full_text)
+print(f"Metadata: {metadata_dict}")
+print(f"Verified: {is_verified}")
 ```
 
 ## How Streaming Works
@@ -101,7 +106,8 @@ metadata = {
 handler = StreamingHandler(
     metadata=metadata,
     target="whitespace",
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 
 # Create a streaming completion
@@ -151,7 +157,8 @@ metadata = {
 handler = StreamingHandler(
     metadata=metadata,
     target="whitespace",
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 
 # Create a streaming completion
@@ -195,7 +202,8 @@ metadata = {
 handler = StreamingHandler(
     metadata=metadata,
     target="whitespace",
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 
 # Create a streaming completion
@@ -245,7 +253,8 @@ metadata = {
 handler = StreamingHandler(
     metadata=metadata,
     target=MetadataTarget.PUNCTUATION,  # Embed after punctuation
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 ```
 
@@ -257,13 +266,15 @@ The `encode_first_chunk_only` parameter determines whether metadata is embedded 
 # Embed only in the first chunk (default)
 handler1 = StreamingHandler(
     metadata=metadata,
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 
 # Embed throughout the stream
 handler2 = StreamingHandler(
     metadata=metadata,
-    encode_first_chunk_only=False
+    encode_first_chunk_only=False,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 ```
 
@@ -276,7 +287,8 @@ You can control the buffering behavior:
 handler = StreamingHandler(
     metadata=metadata,
     min_buffer_size=50,
-    encode_first_chunk_only=True
+    encode_first_chunk_only=True,
+    hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
 )
 ```
 
@@ -314,7 +326,8 @@ async def generate_stream(request: Request):
     handler = StreamingHandler(
         metadata=metadata,
         target="whitespace",
-        encode_first_chunk_only=True
+        encode_first_chunk_only=True,
+        hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
     )
     
     async def generate():
@@ -376,7 +389,8 @@ def generate_stream():
     handler = StreamingHandler(
         metadata=metadata,
         target="whitespace",
-        encode_first_chunk_only=True
+        encode_first_chunk_only=True,
+        hmac_secret_key="your-secret-key"  # Optional: Only needed for HMAC verification
     )
     
     def generate():
@@ -405,4 +419,3 @@ def generate_stream():
 
 if __name__ == "__main__":
     app.run(debug=True)
-```

@@ -85,8 +85,8 @@ class TestLLMOutputsIntegration:
     def test_metadata_encoder_with_llm_outputs(self, provider, sample_text):
         """Test MetadataEncoder with various LLM outputs."""
         # Initialize encoder with a secret key
-        secret_key = "test-secret-key"
-        encoder = MetadataEncoder(secret_key=secret_key)
+        hmac_secret_key = "test-secret-key"
+        encoder = MetadataEncoder(hmac_secret_key=hmac_secret_key)
 
         # Test data
         metadata = {
@@ -120,7 +120,7 @@ class TestLLMOutputsIntegration:
             ), f"Metadata mismatch for {key} in {provider}"
 
         # Test with wrong secret key
-        wrong_encoder = MetadataEncoder(secret_key="wrong-key")
+        wrong_encoder = MetadataEncoder(hmac_secret_key="wrong-key")
         is_valid, _, _ = wrong_encoder.verify_text(encoded_text)
         assert (
             not is_valid
@@ -223,8 +223,8 @@ class TestStreamingIntegration:
     def test_streaming_with_hmac(self, provider, chunks):
         """Test streaming with HMAC verification."""
         # Initialize encoder with a secret key
-        secret_key = "test-secret-key"
-        encoder = MetadataEncoder(secret_key=secret_key)
+        hmac_secret_key = "test-secret-key"
+        encoder = MetadataEncoder(hmac_secret_key=hmac_secret_key)
 
         # Metadata to embed
         metadata = {
@@ -262,7 +262,7 @@ class TestStreamingIntegration:
             ), f"Metadata mismatch for {key} in streaming {provider}"
 
         # Test with wrong secret key
-        wrong_encoder = MetadataEncoder(secret_key="wrong-key")
+        wrong_encoder = MetadataEncoder(hmac_secret_key="wrong-key")
         is_valid, _, _ = wrong_encoder.verify_text(full_text_with_hmac)
         assert (
             not is_valid

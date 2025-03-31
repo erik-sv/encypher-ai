@@ -25,6 +25,7 @@ class StreamingHandler:
         metadata: Optional[Dict[str, Any]] = None,
         target: Union[str, MetadataTarget] = "whitespace",
         encode_first_chunk_only: bool = True,
+        hmac_secret_key: Optional[str] = None,
     ):
         """
         Initialize the streaming handler.
@@ -33,8 +34,10 @@ class StreamingHandler:
             metadata: Dictionary of metadata to encode (model_id, timestamp, etc.)
             target: Where to embed the metadata (whitespace, punctuation, etc.)
             encode_first_chunk_only: Whether to encode metadata only in the first non-empty chunk
+            hmac_secret_key: Optional secret key for HMAC verification
         """
         self.metadata = metadata or {}
+        self.hmac_secret_key = hmac_secret_key
 
         # Ensure we have a timestamp if not provided
         if "timestamp" not in self.metadata:
@@ -103,7 +106,7 @@ class StreamingHandler:
         timestamp = self.metadata.get("timestamp")
 
         encoded_chunk = UnicodeMetadata.embed_metadata(
-            text=chunk,
+            text=self.accumulated_text + chunk,
             model_id=model_id if model_id is not None else "",
             timestamp=(
                 timestamp
@@ -111,6 +114,7 @@ class StreamingHandler:
                 else datetime.now(timezone.utc).isoformat()
             ),
             target=self.target,
+            hmac_secret_key=self.hmac_secret_key,
             custom_metadata={
                 k: v
                 for k, v in self.metadata.items()
@@ -172,6 +176,7 @@ class StreamingHandler:
                             else datetime.now(timezone.utc).isoformat()
                         ),
                         target=self.target,
+                        hmac_secret_key=self.hmac_secret_key,
                         custom_metadata={
                             k: v
                             for k, v in self.metadata.items()
@@ -210,6 +215,7 @@ class StreamingHandler:
                             else datetime.now(timezone.utc).isoformat()
                         ),
                         target=self.target,
+                        hmac_secret_key=self.hmac_secret_key,
                         custom_metadata={
                             k: v
                             for k, v in self.metadata.items()
@@ -248,6 +254,7 @@ class StreamingHandler:
                     else datetime.now(timezone.utc).isoformat()
                 ),
                 target=self.target,
+                hmac_secret_key=self.hmac_secret_key,
                 custom_metadata={
                     k: v
                     for k, v in self.metadata.items()

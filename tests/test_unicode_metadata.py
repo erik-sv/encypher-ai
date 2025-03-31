@@ -94,7 +94,7 @@ class TestUnicodeMetadata:
 
     def test_empty_text(self):
         """Test with empty text."""
-        encoder = MetadataEncoder()
+        encoder = MetadataEncoder(hmac_secret_key="test-secret")
         text = ""
         metadata = {"model_id": "test-model", "timestamp": int(time.time())}
 
@@ -103,15 +103,20 @@ class TestUnicodeMetadata:
 
         # Ensure the text is modified (metadata added)
         assert encoded_text != text
+        assert len(encoded_text) > 0
 
         # Decode metadata
         extracted_metadata, clean_text = encoder.decode_metadata(encoded_text)
 
         # Verify extracted metadata
-        assert extracted_metadata is not None
+        assert (
+            extracted_metadata is not None
+        ), "Metadata should be extracted even from empty text"
         assert extracted_metadata.get("model_id") == metadata["model_id"]
-        # Fix: Compare integers directly
         assert int(extracted_metadata.get("timestamp")) == metadata["timestamp"]
+
+        # Verify clean text
+        assert clean_text == text
 
     def test_datetime_timestamp(self):
         """Test with datetime object as timestamp."""
@@ -149,3 +154,36 @@ class TestUnicodeMetadata:
 
         # Test invalid code point
         assert UnicodeMetadata.from_variation_selector(0x0000) is None
+
+    def test_hmac_verification(self):
+        """Test HMAC verification."""
+        text = "This is a test text."
+        model_id = "test-model"
+        # Use a fixed timestamp to avoid any timing issues
+        timestamp = 1648765432  # Fixed Unix timestamp
+        hmac_secret_key = "test-secret"
+
+        # Create metadata dictionary directly to ensure consistent format
+        metadata = {"model_id": model_id, "timestamp": timestamp}
+
+        # Create encoder with the secret key
+        encoder = MetadataEncoder(hmac_secret_key=hmac_secret_key)
+
+        # Encode the metadata
+        encoded_text = encoder.encode_metadata(text, metadata)
+
+        # Verify with correct key
+        is_valid, extracted_metadata, _ = encoder.verify_text(encoded_text)
+
+        # Check verification result
+        assert is_valid, "HMAC verification should succeed with correct key"
+        assert extracted_metadata is not None
+        assert extracted_metadata.get("model_id") == model_id
+        assert int(extracted_metadata.get("timestamp")) == timestamp
+
+        # Verify with incorrect key
+        wrong_encoder = MetadataEncoder(hmac_secret_key="wrong-secret")
+        is_valid_wrong, _, _ = wrong_encoder.verify_text(encoded_text)
+
+        # Check verification result with wrong key
+        assert not is_valid_wrong, "HMAC verification should fail with incorrect key"
