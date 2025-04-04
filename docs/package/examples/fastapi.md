@@ -38,7 +38,7 @@ import secrets
 app = FastAPI(
     title="EncypherAI Demo",
     description="API for embedding and extracting metadata in text",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 # Add CORS middleware
@@ -130,7 +130,7 @@ with open("templates/index.html", "w") as f:
     "model": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": 1742713200,
-    "version": "1.0.0"
+    "version": "1.1.0"
 }</textarea>
                         </div>
                         <div class="mb-3">
@@ -494,7 +494,7 @@ data = {
         "model": "gpt-4",
         "organization": "EncypherAI",
         "timestamp": int(time.time()),
-        "version": "1.0.0"
+        "version": "1.1.0"
     },
     "target": "whitespace"
 }

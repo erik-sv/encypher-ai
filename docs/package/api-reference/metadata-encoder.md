@@ -96,7 +96,7 @@ encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Original text
@@ -120,6 +120,8 @@ if is_valid:
 else:
     print("Verification failed - content may have been tampered with.")
 ```
+
+> **Note**: For target-based embedding (whitespace, punctuation, etc.), use the `UnicodeMetadata.verify_metadata()` method instead. See [UnicodeMetadata](unicode-metadata.md) for details.
 
 ### Handling Tampered Content
 

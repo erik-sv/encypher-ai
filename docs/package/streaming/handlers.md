@@ -110,7 +110,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "MyCompany",
     "timestamp": datetime.now(timezone.utc).isoformat(),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -172,7 +172,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "MyCompany",
     "timestamp": datetime.now(timezone.utc).isoformat(),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -222,7 +222,7 @@ metadata = {
     "model": "claude-3-opus-20240229",
     "organization": "MyCompany",
     "timestamp": datetime.now(timezone.utc).isoformat(),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -268,7 +268,7 @@ metadata = {
     "model": "gpt-4",
     "provider": "openai",
     "timestamp": datetime.now(timezone.utc).isoformat(),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -324,6 +324,24 @@ The handler uses different strategies for embedding metadata depending on the `e
 ### HMAC Verification
 
 The HMAC signature is calculated based on the entire content, not just individual chunks. This ensures that the verification will detect if any part of the content is modified.
+
+To verify content with embedded metadata from a `StreamingHandler`, use the `UnicodeMetadata.verify_metadata()` method:
+
+```python
+from encypher.core.unicode_metadata import UnicodeMetadata
+
+# After processing all chunks and obtaining the full response
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
+    full_response, 
+    hmac_secret_key="your-secret-key"  # Use the same key provided to the StreamingHandler
+)
+
+if is_valid:
+    print("✅ Verification successful!")
+    print(f"Metadata: {verified_metadata}")
+else:
+    print("❌ Verification failed - content may have been tampered with.")
+```
 
 ## Advanced Usage: Custom Streaming Handler
 

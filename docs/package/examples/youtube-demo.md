@@ -77,6 +77,7 @@ import json
 
 from encypher.core.metadata_encoder import MetadataEncoder
 from encypher.streaming.handlers import StreamingHandler
+from encypher.core.unicode_metadata import UnicodeMetadata
 
 # Initialize rich console for pretty output
 console = Console()
@@ -92,7 +93,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Display the original text
@@ -124,9 +125,12 @@ console.print(Panel(json.dumps(extracted_metadata, indent=2), border_style="blue
 # Verify the text
 console.print("\n[bold]Verifying content integrity...[/bold]")
 time.sleep(1)  # Dramatic pause
-verification_result = encoder.verify_text(encoded_text)
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
+    text=encoded_text,
+    hmac_secret_key="demo-secret-key"
+)
 
-if verification_result:
+if is_valid:
     console.print("\n✅ [bold green]Verification successful![/bold green]")
 else:
     console.print("\n❌ [bold red]Verification failed![/bold red]")
@@ -141,9 +145,12 @@ console.print(Panel(tampered_text, border_style="red"))
 # Verify the tampered text
 console.print("\n[bold]Verifying tampered content...[/bold]")
 time.sleep(1)  # Dramatic pause
-tampered_verification = encoder.verify_text(tampered_text)
+is_valid, verified_tampered = UnicodeMetadata.verify_metadata(
+    text=tampered_text,
+    hmac_secret_key="demo-secret-key"
+)
 
-if tampered_verification:
+if is_valid:
     console.print("\n✅ [bold green]Verification successful![/bold green]")
 else:
     console.print("\n❌ [bold red]Tampering detected![/bold red]")
@@ -168,7 +175,7 @@ streaming_metadata = {
     "model": "streaming-demo",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Create a streaming handler
@@ -213,12 +220,15 @@ console.print("\n[bold]Extracted Streaming Metadata:[/bold]")
 console.print(Panel(json.dumps(extracted_streaming, indent=2), border_style="blue"))
 
 # Verify streaming text
-streaming_verification = encoder.verify_text(full_text)
-if streaming_verification:
+is_valid, verified_streaming = UnicodeMetadata.verify_metadata(
+    text=full_text,
+    hmac_secret_key="demo-secret-key"
+)
+
+if is_valid:
     console.print("\n✅ [bold green]Streaming verification successful![/bold green]")
 else:
     console.print("\n❌ [bold red]Streaming verification failed![/bold red]")
-```
 
 ## Tamper Detection Demonstration
 

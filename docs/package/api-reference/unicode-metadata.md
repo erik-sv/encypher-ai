@@ -185,6 +185,27 @@ def extract_metadata(cls, text: str) -> Tuple[Dict[str, Any], bool]:
     """
 ```
 
+### verify_metadata
+
+```python
+@classmethod
+def verify_metadata(
+    cls, 
+    text: str, 
+    hmac_secret_key: str
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Verify the metadata embedded in text using the provided HMAC secret key.
+    
+    Args:
+        text: Text with embedded metadata
+        hmac_secret_key: HMAC secret key used for verification
+        
+    Returns:
+        Tuple containing a boolean indicating whether the verification was successful and the extracted metadata
+    """
+```
+
 ## MetadataTarget Enum
 
 The `MetadataTarget` enum defines the possible targets for embedding metadata:
@@ -240,11 +261,13 @@ print(encoded_text)
 extracted_metadata = UnicodeMetadata.extract_metadata(encoded_text)
 print(f"\nExtracted metadata: {extracted_metadata}")
 
-# If you used an HMAC secret key and want to verify the metadata
-from encypher.core.metadata_encoder import MetadataEncoder
-encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
-metadata_dict, is_verified = encoder.extract_verified_metadata(encoded_text)
-print(f"\nVerified: {is_verified}")
+# Verify the metadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
+    text=encoded_text,
+    hmac_secret_key="your-secret-key"  # Use the same secret key as above
+)
+print(f"\nVerification result: {'✅ Verified' if is_valid else '❌ Failed'}")
+print(f"Verified metadata: {verified_metadata}")
 
 # Demonstrate variation selector conversion
 byte_value = 65  # ASCII 'A'

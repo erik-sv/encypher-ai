@@ -26,17 +26,17 @@ except Exception as e:
     print("No metadata found or extraction failed:", str(e))
 ```
 
-The `extract_metadata` method scans the text for Unicode variation selectors that represent embedded metadata and converts them back to the original metadata dictionary.
+The `extract_metadata` method scans the text for a special sequence of Zero-Width Characters (ZWCs) at the beginning of the text that marks the start of the embedded data, reads the header information encoded using ZWCs immediately following the start marker to determine the length of the metadata and HMAC, reads the specified number of ZWC-encoded bytes representing the metadata payload and the HMAC signature, converts the ZWC sequences back into binary data for the metadata (usually JSON) and the HMAC, and returns the extracted metadata as a Python dictionary (after JSON deserialization).
 
 ## Understanding the Extraction Process
 
-When extracting metadata, EncypherAI:
+When extracting metadata, EncypherAI's `MetadataEncoder` performs the following steps:
 
-1. Scans the text for Unicode variation selectors
-2. Converts the variation selectors back to bytes
-3. Parses the header to identify the format and version
-4. Extracts the metadata content and HMAC signature
-5. Returns the metadata as a Python dictionary
+1. **Locates Data Block**: Identifies a special sequence of Zero-Width Characters (ZWCs) at the beginning of the text that marks the start of the embedded data.
+2. **Reads Header**: Parses header information encoded using ZWCs immediately following the start marker to determine the length of the metadata and HMAC.
+3. **Extracts Content**: Reads the specified number of ZWC-encoded bytes representing the metadata payload and the HMAC signature.
+4. **Decodes**: Converts the ZWC sequences back into binary data for the metadata (usually JSON) and the HMAC.
+5. **Returns Metadata**: Returns the extracted metadata as a Python dictionary (after JSON deserialization).
 
 ![Metadata Extraction Process](../../assets/metadata-extraction-diagram.png)
 
@@ -113,7 +113,7 @@ Verification can fail for several reasons:
 1. **Content Modification**: The text has been modified after metadata was embedded
 2. **Incorrect Secret Key**: The wrong secret key is being used for verification
 3. **Metadata Corruption**: The embedded metadata has been corrupted
-4. **Metadata Removal**: Some or all of the variation selectors have been removed
+4. **Data Block Alteration**: The prepended block containing metadata/HMAC (marked by Zero-Width Characters) has been altered or removed.
 
 ### Example: Detecting Modified Text
 

@@ -388,9 +388,12 @@ if final_chunk:
     full_text += final_chunk
 
 # Extract and verify the metadata
-from encypher.core.metadata_encoder import MetadataEncoder
+from encypher.core.unicode_metadata import UnicodeMetadata
 
-encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
-metadata_dict, is_verified = encoder.extract_verified_metadata(full_text)
-print(f"\nMetadata: {metadata_dict}")
-print(f"Verified: {is_verified}")
+# Verify the metadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
+    text=full_text,
+    hmac_secret_key="your-secret-key"  # Use the same secret key as above
+)
+print(f"\nMetadata: {verified_metadata}")
+print(f"Verified: {is_valid}")

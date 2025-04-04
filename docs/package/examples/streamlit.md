@@ -139,7 +139,7 @@ def basic_embedding():
                 "Timestamp:", 
                 value=str(int(time.time()))
             )
-            version = st.text_input("Version:", value="1.0.0")
+            version = st.text_input("Version:", value="1.1.0")
         
         # Additional custom fields
         custom_fields = {}
@@ -223,8 +223,13 @@ def basic_embedding():
             )
             
             # Verification status
-            verification = encoder.verify_text(encoded_text)
-            if verification:
+            from encypher.core.unicode_metadata import UnicodeMetadata
+            verified, metadata_dict = UnicodeMetadata.verify_metadata(
+                encoded_text,
+                hmac_secret_key=secret_key if use_custom_key else None
+            )
+            
+            if verified:
                 st.success("✅ Verification successful: Content integrity confirmed")
             else:
                 st.error("❌ Verification failed: Content may have been tampered with")
@@ -242,7 +247,7 @@ import streamlit as st
 import time
 import json
 from encypher.core.metadata_encoder import MetadataEncoder
-from encypher.core.unicode_metadata import MetadataTarget
+from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
 from encypher.streaming.handlers import StreamingHandler
 
 # App title and description
@@ -286,7 +291,7 @@ with tabs[0]:
     
     with col2:
         timestamp = st.text_input("Timestamp:", value=str(int(time.time())))
-        version = st.text_input("Version:", value="1.0.0")
+        version = st.text_input("Version:", value="1.1.0")
     
     # Target selection
     target = st.selectbox(
@@ -315,7 +320,12 @@ with tabs[0]:
             st.json(metadata)
             
             # Verification
-            verified = encoder.verify_text(encoded_text)
+            from encypher.core.unicode_metadata import UnicodeMetadata
+            verified, metadata_dict = UnicodeMetadata.verify_metadata(
+                encoded_text,
+                hmac_secret_key=None
+            )
+            
             if verified:
                 st.success("✅ Verification successful")
             else:
@@ -336,22 +346,23 @@ with tabs[1]:
     
     # Extract button
     if st.button("Extract Metadata", key="extract_btn") and encoded_text:
-        encoder = MetadataEncoder()
+        from encypher.core.unicode_metadata import UnicodeMetadata
+        extracted = UnicodeMetadata.extract_metadata(encoded_text)
         
-        try:
-            # Extract metadata
-            extracted_metadata = encoder.decode_metadata(encoded_text)
-            
-            # Display results
-            st.subheader("Extracted Metadata")
-            st.json(extracted_metadata)
-            
-            # Verify
-            verified = encoder.verify_text(encoded_text)
-            if verified:
-                st.success("✅ Content integrity verified")
-            else:
-                st.warning("⚠️ Content may have been tampered with")
+        # Verify if possible
+        verified, metadata_dict = UnicodeMetadata.verify_metadata(
+            encoded_text,
+            hmac_secret_key=None
+        )
+        
+        # Display results
+        st.subheader("Extracted Metadata")
+        st.json(extracted)
+        
+        if verified:
+            st.success("✅ Content integrity verified")
+        else:
+            st.warning("⚠️ Content may have been tampered with")
                 
         except Exception as e:
             st.error(f"Error extracting metadata: {str(e)}")
@@ -378,7 +389,7 @@ with tabs[2]:
     metadata = {
         "model": "verification-demo",
         "timestamp": int(time.time()),
-        "version": "1.0.0"
+        "version": "1.1.0"
     }
     
     # Embed and verify
@@ -403,7 +414,11 @@ with tabs[2]:
             
             with col1:
                 st.subheader("Original Verification")
-                verified = encoder.verify_text(encoded_text)
+                from encypher.core.unicode_metadata import UnicodeMetadata
+                verified, metadata_dict = UnicodeMetadata.verify_metadata(
+                    encoded_text,
+                    hmac_secret_key=secret_key
+                )
                 if verified:
                     st.success("✅ Verification successful")
                 else:
@@ -411,7 +426,10 @@ with tabs[2]:
             
             with col2:
                 st.subheader("Tampered Verification")
-                verified = encoder.verify_text(tampered_text)
+                verified, metadata_dict = UnicodeMetadata.verify_metadata(
+                    tampered_text,
+                    hmac_secret_key=secret_key
+                )
                 if verified:
                     st.success("✅ Verification successful")
                 else:
@@ -437,7 +455,7 @@ with tabs[3]:
         metadata = {
             "model": "streaming-demo",
             "timestamp": int(time.time()),
-            "version": "1.0.0"
+            "version": "1.1.0"
         }
         st.json(metadata)
     
@@ -486,10 +504,13 @@ with tabs[3]:
             stream_container.text_area("", accumulated_text, height=150, disabled=True)
         
         # Verify the result
-        encoder = MetadataEncoder()
+        from encypher.core.unicode_metadata import UnicodeMetadata
         try:
-            extracted_metadata = encoder.decode_metadata(accumulated_text)
-            verified = encoder.verify_text(accumulated_text)
+            extracted_metadata = UnicodeMetadata.extract_metadata(accumulated_text)
+            verified, metadata_dict = UnicodeMetadata.verify_metadata(
+                accumulated_text,
+                hmac_secret_key="your-secret-key"
+            )
             
             st.subheader("Streaming Results")
             st.json(extracted_metadata)

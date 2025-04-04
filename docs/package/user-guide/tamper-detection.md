@@ -65,7 +65,8 @@ encoded_text = encoder.encode_metadata("This is the original AI-generated conten
 tampered_text = "This has been changed but still has the metadata."
 
 # Verification will fail
-is_valid, _, _ = encoder.verify_text(tampered_text)  # is_valid will be False
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, _ = UnicodeMetadata.verify_metadata(tampered_text, hmac_secret_key="your-secure-secret-key")  # is_valid will be False
 ```
 
 ### 2. Metadata Forgery
@@ -82,8 +83,8 @@ fake_metadata = {"model_id": "fake-model", "timestamp": int(time.time())}
 fake_encoded_text = attacker_encoder.encode_metadata("This is fake content.", fake_metadata)
 
 # Verification with the correct key will fail
-original_encoder = MetadataEncoder(secret_key="original-key")
-is_valid, _, _ = original_encoder.verify_text(fake_encoded_text)  # is_valid will be False
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, _ = UnicodeMetadata.verify_metadata(fake_encoded_text, hmac_secret_key="original-key")  # is_valid will be False
 ```
 
 ## Example Usage
@@ -92,6 +93,7 @@ Here's how to implement tamper detection in your application:
 
 ```python
 from encypher.core.metadata_encoder import MetadataEncoder
+from encypher.core.unicode_metadata import UnicodeMetadata
 import time
 
 # Initialization
@@ -99,20 +101,20 @@ encoder = MetadataEncoder(secret_key="your-secure-secret-key")
 
 # Embedding metadata
 original_text = "Content authenticity is crucial in the age of AI-generated media."
-metadata = {"model_id": "gpt-4", "timestamp": int(time.time())}
+metadata = {"model_id": "gpt-4", "timestamp": int(time.time()), "version": "1.1.0"}
 encoded_text = encoder.encode_metadata(original_text, metadata)
 
 # Verifying untampered text
-is_valid, extracted_metadata, clean_text = encoder.verify_text(encoded_text)
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_text, hmac_secret_key="your-secure-secret-key")
 if is_valid:
     print("✅ Verification successful!")
-    print(f"Metadata: {extracted_metadata}")
+    print(f"Metadata: {verified_metadata}")
 else:
     print("🚨 Tampering detected!")
 
 # Simulating tampering by modifying text
 tampered_text = encoded_text.replace("authenticity", "integrity")
-is_valid, extracted_metadata, clean_text = encoder.verify_text(tampered_text)
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(tampered_text, hmac_secret_key="your-secure-secret-key")
 if not is_valid:
     print("🚨 Tampering detected! The content has been modified.")
 ```

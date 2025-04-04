@@ -26,7 +26,7 @@ import time
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0",
+    "version": "1.1.0",
     "organization": "EncypherAI"
 }
 

@@ -68,12 +68,13 @@ print("\nResponse with embedded metadata:")
 print(encoded_text)
 
 # Later, extract and verify the metadata
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_text, hmac_secret_key="your-secret-key")
 extracted_metadata, clean_text = encoder.decode_metadata(encoded_text)
-is_verified = encoder.verify_text(encoded_text)
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if is_verified else '❌ Failed'}")
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ### Streaming Response
@@ -136,14 +137,14 @@ print("\n\nStreaming completed!")
 
 # Extract and verify the metadata
 from encypher.core import MetadataEncoder
-
 encoder = MetadataEncoder(hmac_secret_key="your-secret-key")
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(full_response, hmac_secret_key="your-secret-key")
 extracted_metadata, clean_text = encoder.decode_metadata(full_response)
-is_verified = encoder.verify_text(full_response)
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if is_verified else '❌ Failed'}")
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Advanced Integration
@@ -436,13 +437,13 @@ async def verify(request: Request):
     
     # Extract and verify metadata
     try:
-        metadata, clean_text = encoder.decode_metadata(text)
-        verified = encoder.verify_text(text)
+        from encypher.core.unicode_metadata import UnicodeMetadata
+        is_valid, verified_metadata = UnicodeMetadata.verify_metadata(text, hmac_secret_key="your-secret-key")
         
         return {
             "has_metadata": True,
-            "metadata": metadata,
-            "verified": verified
+            "metadata": verified_metadata,
+            "verified": is_valid
         }
     except Exception as e:
         return {

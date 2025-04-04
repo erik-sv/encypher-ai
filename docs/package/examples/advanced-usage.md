@@ -67,7 +67,7 @@ text = "This is a sample text for advanced encoding."
 metadata = {
     "model": "gpt-4",
     "organization": "EncypherAI",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Encode with enhanced metadata
@@ -138,7 +138,7 @@ texts = [
 metadata_template = {
     "model": "gpt-4",
     "organization": "EncypherAI",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Process batch
@@ -215,7 +215,7 @@ metadata = {
     "model": "streaming-demo",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 handler = EnhancedStreamingHandler(
@@ -246,9 +246,8 @@ if final_chunk:
 print(f"Final text: {full_text}")
 
 # Extract metadata
-from encypher.core.metadata_encoder import MetadataEncoder
-encoder = MetadataEncoder()
-extracted = encoder.decode_metadata(full_text)
+from encypher.core.unicode_metadata import UnicodeMetadata
+extracted = UnicodeMetadata.extract_metadata(full_text)
 print(f"Extracted metadata: {json.dumps(extracted, indent=2)}")
 ```
 
@@ -328,7 +327,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Encode metadata

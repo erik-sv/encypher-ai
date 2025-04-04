@@ -32,25 +32,26 @@ The default target is `whitespace`, which provides a good balance between robust
 ## Basic Usage
 
 ```python
-from encypher.core.metadata_encoder import MetadataEncoder
+from encypher.core.unicode_metadata import UnicodeMetadata, MetadataTarget
 import time
-
-# Create a metadata encoder
-encoder = MetadataEncoder()
 
 # Sample text
 text = "This is a sample text that will have metadata embedded within it."
 
 # Create metadata
-metadata = {
-    "model_id": "gpt-4",
-    "organization": "EncypherAI",
-    "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0"
-}
+model_id = "gpt-4"
+organization = "EncypherAI"
+timestamp = int(time.time())  # Unix/Epoch timestamp
+version = "1.1.0"
 
 # Embed metadata
-encoded_text = encoder.encode_metadata(text, metadata)
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    model_id=model_id,
+    timestamp=timestamp,
+    custom_metadata={"organization": organization, "version": version},
+    target=MetadataTarget.WHITESPACE  # Default target
+)
 
 print("Original text:")
 print(text)
@@ -58,13 +59,15 @@ print("\nEncoded text (looks identical but contains embedded metadata):")
 print(encoded_text)
 
 # Extract metadata
-is_valid, extracted_metadata = encoder.extract_metadata(encoded_text)
+extracted_metadata = UnicodeMetadata.extract_metadata(encoded_text)
 print("\nExtracted metadata:")
 print(extracted_metadata)
 
 # Verify the text hasn't been tampered with
-is_valid, extracted_metadata, clean_text = encoder.verify_text(encoded_text)
-print(f"\nVerification result: {'✅ Verified' if is_valid else '❌ Failed'}")
+metadata_dict, is_verified = UnicodeMetadata.verify_metadata(text=encoded_text, hmac_secret_key=None)
+print(f"\nVerification result: {'✅ Verified' if is_verified else '❌ Failed'}")
+if metadata_dict:
+    print("Metadata:", metadata_dict)
 ```
 
 ## HMAC Verification
@@ -79,16 +82,29 @@ This signature is embedded alongside the metadata. When extracting metadata, the
 ### Using a Custom Secret Key
 
 ```python
-from encypher.core.metadata_encoder import MetadataEncoder
+from encypher.core.unicode_metadata import UnicodeMetadata, MetadataTarget
 
-# Create a metadata encoder with a custom secret key
-encoder = MetadataEncoder(secret_key="your-secret-key")
+secret_key = "your-secret-key"
+# Assume text and metadata are defined as in the previous example
 
 # Embed metadata
-encoded_text = encoder.encode_metadata(text, metadata)
+encoded_text_hmac = UnicodeMetadata.embed_metadata(
+    text=text,
+    model_id=model_id,
+    timestamp=timestamp,
+    custom_metadata={"organization": organization, "version": version},
+    target=MetadataTarget.WHITESPACE,
+    hmac_secret_key=secret_key
+)
 
 # Verify using the same secret key
-is_valid, extracted_metadata, clean_text = encoder.verify_text(encoded_text)
+verified_metadata, is_valid = UnicodeMetadata.verify_metadata(
+    text=encoded_text_hmac,
+    hmac_secret_key=secret_key
+)
+print(f"Verification with key: {'✅ Verified' if is_valid else '❌ Failed'}")
+if is_valid:
+    print("Verified Metadata:", verified_metadata)
 ```
 
 ### Verification Process
@@ -108,16 +124,26 @@ If they match, the verification succeeds, indicating the content hasn't been tam
 You can specify where to embed metadata using either a string or the `MetadataTarget` enum:
 
 ```python
-from encypher.core.metadata_encoder import MetadataEncoder
-from encypher.core.unicode_metadata import MetadataTarget
+from encypher.core.unicode_metadata import UnicodeMetadata, MetadataTarget
+# Assume text, model_id, timestamp, custom_metadata are defined
 
 # Using a string
-encoder1 = MetadataEncoder()
-encoded_text1 = encoder1.encode_metadata(text, metadata, target="punctuation")
+encoded_text1 = UnicodeMetadata.embed_metadata(
+    text=text,
+    model_id=model_id,
+    timestamp=timestamp,
+    custom_metadata=custom_metadata,
+    target="punctuation"
+)
 
 # Using the enum
-encoder2 = MetadataEncoder()
-encoded_text2 = encoder2.encode_metadata(text, metadata, target=MetadataTarget.PUNCTUATION)
+encoded_text2 = UnicodeMetadata.embed_metadata(
+    text=text,
+    model_id=model_id,
+    timestamp=timestamp,
+    custom_metadata=custom_metadata,
+    target=MetadataTarget.FIRST_LETTER
+)
 ```
 
 ### Metadata Size Considerations
@@ -136,7 +162,7 @@ from encypher.core.unicode_metadata import UnicodeMetadata, MetadataTarget
 import json
 
 # Estimate metadata size (in bytes)
-metadata_json = json.dumps(metadata).encode('utf-8')
+metadata_json = json.dumps({"model_id": model_id, "timestamp": timestamp, "custom": custom_metadata}).encode('utf-8')
 metadata_size = len(metadata_json)
 
 # Find available targets
@@ -170,7 +196,6 @@ Different target types offer different trade-offs between capacity and robustnes
 | `all_characters` | High | Low | Minimal | Maximum capacity needed |
 
 ```python
-from encypher.core.metadata_encoder import MetadataEncoder
 from encypher.core.unicode_metadata import UnicodeMetadata, MetadataTarget
 import pandas as pd
 import time
@@ -179,22 +204,32 @@ import time
 text = "This is a sample text that will have metadata embedded within it."
 
 # Create metadata
-metadata = {
-    "model_id": "gpt-4",
-    "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0"
-}
+model_id = "gpt-4"
+timestamp = int(time.time())  # Unix/Epoch timestamp
+custom_metadata = {"organization": "EncypherAI", "version": "1.1.0"}
 
 # Test different targets
 results = []
-for target in [t for t in MetadataTarget]:
+for target in [t for t in MetadataTarget if t != MetadataTarget.NONE]:
     # Count available targets
     targets = UnicodeMetadata.find_targets(text, target)
     
+    # Define metadata for embedding
+    current_metadata = {
+        "model_id": model_id,
+        "timestamp": timestamp,
+        "custom": custom_metadata
+    }
+    
     # Try to embed metadata
-    encoder = MetadataEncoder()
     try:
-        encoded = encoder.encode_metadata(text, metadata, target=target)
+        encoded = UnicodeMetadata.embed_metadata(
+            text=text,
+            model_id=model_id,
+            timestamp=timestamp,
+            custom_metadata=custom_metadata,
+            target=target
+        )
         success = True
     except ValueError:
         success = False
@@ -218,19 +253,17 @@ EncypherAI's HMAC verification can detect various types of tampering:
 ### Example: Detecting Modified Text
 
 ```python
-from encypher.core.metadata_encoder import MetadataEncoder
-
-# Create a metadata encoder
-encoder = MetadataEncoder()
-
-# Embed metadata
-encoded_text = encoder.encode_metadata(text, metadata)
+from encypher.core.unicode_metadata import UnicodeMetadata
+# Assume encoded_text_hmac and secret_key are from the HMAC example above
 
 # Simulate tampering by modifying the text
-tampered_text = encoded_text.replace("sample", "modified")
+tampered_text = encoded_text_hmac.replace("sample", "modified")
 
 # Try to verify the tampered text
-is_valid, extracted_metadata, clean_text = encoder.verify_text(tampered_text)
+verified_metadata, is_valid = UnicodeMetadata.verify_metadata(
+    text=tampered_text,
+    hmac_secret_key=secret_key  # Use the correct key
+)
 print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
@@ -238,15 +271,24 @@ print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 
 ```python
 import re
+from encypher.core.unicode_metadata import UnicodeMetadata
+# Assume encoded_text_hmac and secret_key are from the HMAC example above
 
 # Simulate tampering by removing variation selectors
-tampered_text = re.sub(r'[\uFE00-\uFE0F\U000E0100-\U000E01EF]', '', encoded_text)
+tampered_text_removed_vs = re.sub(r'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', encoded_text_hmac)
 
 # Try to extract metadata
 try:
-    is_valid, extracted = encoder.extract_metadata(tampered_text)
-    print("Metadata found:", extracted)
-except Exception as e:
+    # Verification should fail because the signature is gone
+    verified_metadata, is_valid = UnicodeMetadata.verify_metadata(
+        text=tampered_text_removed_vs,
+        hmac_secret_key=secret_key
+    )
+    print(f"Verification after removing VS: {'✅ Verified' if is_valid else '❌ Failed'}")
+    # Extraction might still return something if parsing is lenient, or a default dict
+    extracted = UnicodeMetadata.extract_metadata(tampered_text_removed_vs)
+    print("Attempted extraction after removing VS:", extracted)
+except Exception as e:  # Catch potential errors during processing badly tampered data
     print("Metadata extraction failed:", str(e))
 ```
 
@@ -297,7 +339,6 @@ The embedded metadata follows this structure:
 
 ## Related Documentation
 
-- [MetadataEncoder API Reference](../api-reference/metadata-encoder.md)
 - [UnicodeMetadata API Reference](../api-reference/unicode-metadata.md)
 - [Streaming Support Guide](./streaming.md)
 - [Jupyter Notebook Examples](../examples/jupyter.md)

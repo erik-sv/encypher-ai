@@ -26,7 +26,7 @@ metadata = {
     "model_id": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -56,7 +56,6 @@ for chunk in chunks:
 full_text = "".join(processed_chunks)
 
 # Extract and verify the metadata
-from encypher.core.metadata_encoder import MetadataEncoder
 from encypher.core.unicode_metadata import UnicodeMetadata
 
 # Extract metadata without verification
@@ -64,14 +63,15 @@ extracted_metadata = UnicodeMetadata.extract_metadata(full_text)
 print(f"Extracted metadata: {extracted_metadata}")
 
 # For verification with HMAC
-encoder = MetadataEncoder(hmac_secret_key="your-secret-key")  # Use the same secret key as above
-is_valid = encoder.verify_text(full_text)
-print(f"Verification result: {is_valid}")
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
+    full_text,
+    hmac_secret_key="your-secret-key"  # Use the same secret key as above
+)
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
+print(f"Verified metadata: {verified_metadata}")
 
-# Or extract and verify in one step
-metadata_dict, is_verified = encoder.extract_verified_metadata(full_text)
-print(f"Metadata: {metadata_dict}")
-print(f"Verified: {is_verified}")
+# Note: StreamingHandler uses UnicodeMetadata for target-based embedding
+# which enables precise metadata placement in streaming content
 ```
 
 ## How Streaming Works
@@ -100,6 +100,7 @@ metadata = {
     "model_id": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time())  # Unix/Epoch timestamp
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -151,6 +152,7 @@ metadata = {
     "model_id": "claude-3-opus-20240229",
     "organization": "EncypherAI",
     "timestamp": int(time.time())  # Unix/Epoch timestamp
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -196,6 +198,7 @@ metadata = {
     "model_id": "gpt-4",
     "provider": "openai",
     "timestamp": int(time.time())  # Unix/Epoch timestamp
+    "version": "1.1.0"
 }
 
 # Initialize the streaming handler
@@ -225,9 +228,11 @@ for chunk in response:
         # Process the chunk
         processed_chunk = handler.process_chunk(chunk=content)
         
-        # Print and accumulate the processed chunk
-        print(processed_chunk, end="", flush=True)
-        full_response += processed_chunk
+        # Yield the processed chunk
+        yield processed_chunk
+        
+        # Add a small delay to simulate real-time streaming
+        await asyncio.sleep(0.01)
 
 print("\n\nStreaming completed!")
 ```
@@ -247,6 +252,7 @@ import time
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time())  # Unix/Epoch timestamp
+    "version": "1.1.0"
 }
 
 # Initialize with custom target
@@ -320,6 +326,7 @@ async def generate_stream(request: Request):
         "model_id": "gpt-4",
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
         "request_id": data.get("request_id", str(time.time()))
+        "version": "1.1.0"
     }
     
     # Initialize the streaming handler
@@ -383,6 +390,7 @@ def generate_stream():
         "model_id": "gpt-4",
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
         "request_id": data.get("request_id", str(time.time()))
+        "version": "1.1.0"
     }
     
     # Initialize the streaming handler

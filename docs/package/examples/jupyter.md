@@ -41,7 +41,7 @@ metadata = {
     "model": "example-model",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Display the metadata
@@ -66,9 +66,9 @@ print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
 
 # Verify the text hasn't been tampered with
-verification_result = encoder.verify_text(encoded_text)
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_text, hmac_secret_key="your-secret-key")
 
-print(f"\nVerification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(f"\nVerification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Interactive Visualization Notebook
@@ -98,7 +98,7 @@ metadata = {
     "model": "example-model",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Embed metadata with different targets
@@ -176,11 +176,11 @@ for target in targets:
 # Extract and verify metadata
 for target in targets:
     extracted = encoder.decode_metadata(encoded_texts[target.name])
-    verified = encoder.verify_text(encoded_texts[target.name])
+    is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_texts[target.name], hmac_secret_key="your-secret-key")
     
     print(f"\nTarget: {target.name}")
     print(f"Metadata extracted: {json.dumps(extracted, indent=2)}")
-    print(f"Verification result: {'✅ Verified' if verified else '❌ Failed'}")
+    print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Streaming Example Notebook
@@ -202,7 +202,7 @@ metadata = {
     "model": "streaming-example",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Create a streaming handler
@@ -250,11 +250,11 @@ print(full_text)
 # Extract and verify the metadata
 encoder = MetadataEncoder()
 extracted_metadata = encoder.decode_metadata(full_text)
-verification_result = encoder.verify_text(full_text)
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(full_text, hmac_secret_key="your-secret-key")
 
 print("\nExtracted metadata:")
 print(json.dumps(extracted_metadata, indent=2))
-print(f"\nVerification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(f"\nVerification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Tamper Detection Example
@@ -279,7 +279,7 @@ metadata = {
     "model": "tamper-detection-example",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Embed metadata
@@ -291,8 +291,8 @@ print("\nMetadata:")
 print(json.dumps(metadata, indent=2))
 
 # Verify the original text
-verification_result = encoder.verify_text(encoded_text)
-print(f"\nVerification result (original): {'✅ Verified' if verification_result else '❌ Failed'}")
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_text, hmac_secret_key="my-secret-key")
+print(f"\nVerification result (original): {'✅ Verified' if is_valid else '❌ Failed'}")
 
 # Create tampered versions
 tampered_versions = {
@@ -316,15 +316,15 @@ for name, text in tampered_versions.items():
     
     # Try to verify
     try:
-        verified = encoder.verify_text(text)
+        is_valid, verified_metadata = UnicodeMetadata.verify_metadata(text, hmac_secret_key="my-secret-key")
     except:
-        verified = False
+        is_valid = False
     
     # Print results
     print(f"\n{name}:")
     print(f"Text: {text[:50]}..." if len(text) > 50 else f"Text: {text}")
     print(f"Metadata found: {'Yes' if metadata_found else 'No'}")
-    print(f"Verification result: {'✅ Verified' if verified else '❌ Failed'}")
+    print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Advanced: Custom Metadata Encoder
@@ -380,7 +380,7 @@ text = "This text will have custom metadata embedded."
 metadata = {
     "model": "custom-example",
     "user_id": "user123",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Embed metadata

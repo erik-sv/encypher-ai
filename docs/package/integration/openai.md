@@ -63,12 +63,12 @@ print("\nResponse with embedded metadata:")
 print(encoded_text)
 
 # Later, extract and verify the metadata
-extracted_metadata = encoder.decode_metadata(encoded_text)
-verification_result = encoder.verify_text(encoded_text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(encoded_text, hmac_secret_key="your-secret-key")  # Pass the same secret_key used during encoding
 
 print("\nExtracted metadata:")
-print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(json.dumps(verified_metadata, indent=2))
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ### Streaming Response
@@ -122,15 +122,12 @@ handler.finalize()
 print("\n\nStreaming completed!")
 
 # Extract and verify the metadata
-from encypher.core import MetadataEncoder
-
-encoder = MetadataEncoder(secret_key="your-secret-key")  # Optional: secret_key is only needed if you want HMAC verification
-extracted_metadata = encoder.decode_metadata(full_response)
-verification_result = encoder.verify_text(full_response, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
+from encypher.core.unicode_metadata import UnicodeMetadata
+is_valid, verified_metadata = UnicodeMetadata.verify_metadata(full_response, hmac_secret_key="your-secret-key")  # Pass the same secret_key used during encoding
 
 print("\nExtracted metadata:")
-print(json.dumps(extracted_metadata, indent=2))
-print(f"Verification result: {'✅ Verified' if verification_result else '❌ Failed'}")
+print(json.dumps(verified_metadata, indent=2))
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
 
 ## Advanced Integration
@@ -343,13 +340,13 @@ def verify():
     
     # Extract and verify metadata
     try:
-        metadata = encoder.decode_metadata(text)
-        verified = encoder.verify_text(text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
+        from encypher.core.unicode_metadata import UnicodeMetadata
+        is_valid, verified_metadata = UnicodeMetadata.verify_metadata(text, hmac_secret_key="your-secret-key")  # Pass the same secret_key used during encoding
         
         return jsonify({
             "has_metadata": True,
-            "metadata": metadata,
-            "verified": verified
+            "metadata": verified_metadata,
+            "verified": is_valid
         })
     except Exception as e:
         return jsonify({

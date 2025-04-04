@@ -34,7 +34,7 @@ import json
 app = FastAPI(
     title="EncypherAI API",
     description="API for embedding and extracting metadata in text",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 # Add CORS middleware
@@ -124,7 +124,8 @@ async def verify_text(request: VerifyRequest):
         result["metadata"] = metadata
         
         # Verify the text
-        result["verified"] = encoder.verify_text(request.text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
+        from encypher.core.unicode_metadata import UnicodeMetadata
+        result["verified"], verified_metadata = UnicodeMetadata.verify_metadata(request.text, hmac_secret_key="your-secret-key")  # Pass the same secret_key used during encoding
     except Exception as e:
         result["error"] = str(e)
     
@@ -142,10 +143,11 @@ async def extract_verified_metadata(request: VerifyRequest):
     
     try:
         # Extract and verify metadata
-        metadata, verified = encoder.extract_verified_metadata(request.text, secret_key="your-secret-key")  # Pass the same secret_key used during encoding
+        from encypher.core.unicode_metadata import UnicodeMetadata
+        is_valid, verified_metadata = UnicodeMetadata.verify_metadata(request.text, hmac_secret_key="your-secret-key")
         result["has_metadata"] = True
-        result["metadata"] = metadata
-        result["verified"] = verified
+        result["metadata"] = verified_metadata
+        result["verified"] = is_valid
     except Exception as e:
         result["error"] = str(e)
     

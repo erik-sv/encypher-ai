@@ -53,7 +53,7 @@ metadata = {
     "model_id": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
 
 # Embed metadata
@@ -61,57 +61,29 @@ encoded_text = encoder.encode_metadata(text, metadata)
 
 print("Original text:")
 print(text)
-print("\nEncoded text (looks identical but contains embedded metadata):")
+print("\nEncoded text (looks identical but contains invisible zero-width characters that encode the metadata):")
 print(encoded_text)
-```
 
 The encoded text will look identical to the original text to human readers, but it contains invisible metadata that can be extracted programmatically.
 
-## Choosing Embedding Targets
-
-You can specify where to embed metadata using the `target` parameter:
-
-```python
-# Embed metadata after whitespace (default)
-whitespace_encoded = encoder.encode_metadata(text, metadata, target="whitespace")
-
-# Embed metadata after punctuation
-punctuation_encoded = encoder.encode_metadata(text, metadata, target="punctuation")
-
-# Embed metadata after the first letter of each word
-first_letter_encoded = encoder.encode_metadata(text, metadata, target="first_letter")
-
-# Embed metadata after the last letter of each word
-last_letter_encoded = encoder.encode_metadata(text, metadata, target="last_letter")
-
-# Embed metadata after any character
-all_chars_encoded = encoder.encode_metadata(text, metadata, target="all_characters")
-```
-
-You can also use the `MetadataTarget` enum:
-
-```python
-from encypher.core.unicode_metadata import MetadataTarget
-
-# Embed metadata after whitespace
-whitespace_encoded = encoder.encode_metadata(text, metadata, target=MetadataTarget.WHITESPACE)
-```
+*Note: For target-based embedding (whitespace, punctuation etc.), use `UnicodeMetadata` instead.*
 
 ## Extracting Metadata
 
-To extract metadata from encoded text:
+To extract metadata from encoded text (without verification):
 
 ```python
-# Extract metadata
-try:
-    is_valid, extracted_metadata = encoder.extract_metadata(encoded_text)
-    if is_valid:
-        print("Extracted metadata:")
-        print(extracted_metadata)
-    else:
-        print("Metadata extraction failed: Invalid metadata")
-except Exception as e:
-    print("No metadata found or extraction failed:", str(e))
+# Extract metadata using decode_metadata
+# Returns: (metadata_dict | None, clean_text)
+extracted_metadata, clean_text = encoder.decode_metadata(encoded_text)
+
+if extracted_metadata:
+    print("Extracted metadata:")
+    print(extracted_metadata)
+    print("Clean text:")
+    print(clean_text)
+else:
+    print("No metadata found or failed to decode.")
 ```
 
 ## Verifying Metadata
@@ -122,22 +94,28 @@ To verify that the text hasn't been tampered with:
 # Verify the text
 is_valid, extracted_metadata, clean_text = encoder.verify_text(encoded_text)
 print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
+if is_valid:
+    print("Metadata:", extracted_metadata)
+    print("Clean text:", clean_text)
 ```
 
 ## Combined Extraction and Verification
 
-For convenience, you can extract and verify metadata in a single operation:
+You can also extract and verify metadata in a single operation using `extract_verified_metadata`:
 
 ```python
-# Extract and verify metadata
-try:
-    is_valid, extracted_metadata, clean_text = encoder.extract_verified_metadata(encoded_text)
-    if is_valid:
+# Extract and verify metadata using extract_verified_metadata
+# Returns: (metadata_dict, is_verified)
+# Note: This method requires the encoder to be initialized with the correct secret_key
+extracted_metadata, is_verified = encoder.extract_verified_metadata(encoded_text)
+
+if extracted_metadata:
+    if is_verified:
         print("✅ Verified metadata:", extracted_metadata)
     else:
         print("❌ Metadata found but verification failed:", extracted_metadata)
-except Exception as e:
-    print("No metadata found or extraction failed:", str(e))
+else:
+    print("No metadata found.")
 ```
 
 ## Working with Streaming Content
@@ -158,7 +136,6 @@ metadata = {
 # Initialize the streaming handler
 handler = StreamingHandler(
     metadata=metadata,
-    target="whitespace",
     encode_first_chunk_only=True
 )
 
@@ -180,12 +157,12 @@ for chunk in chunks:
 # Combine all processed chunks
 full_text = "".join(processed_chunks)
 
-# Extract and verify the metadata
-is_valid, extracted_metadata = UnicodeMetadata.extract_metadata(full_text)
+# Verify the text
+is_valid, extracted_metadata, clean_text = encoder.verify_text(full_text)
+print(f"Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 if is_valid:
-    print(f"Extracted metadata: {extracted_metadata}")
-else:
-    print("Metadata extraction failed")
+    print("Metadata:", extracted_metadata)
+    print("Clean text:", clean_text)
 ```
 
 ## Integration with OpenAI
@@ -250,7 +227,7 @@ def create_metadata(model_id="gpt-4", organization="EncypherAI"):
         "model_id": model_id,
         "organization": organization,
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
-        "version": "1.0.0"
+        "version": "1.1.0"
     }
 
 # Use the function
@@ -276,7 +253,8 @@ for i, text in enumerate(texts):
         "model_id": "gpt-4",
         "organization": "EncypherAI",
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
-        "text_id": i + 1
+        "text_id": i + 1,
+        "version": "1.1.0"
     }
     
     # Embed metadata
@@ -287,23 +265,27 @@ for i, text in enumerate(texts):
 
 # Later, extract and verify metadata
 for i, encoded_text in enumerate(encoded_texts):
-    try:
-        is_valid, extracted_metadata = encoder.extract_metadata(encoded_text)
-        if is_valid:
-            print(f"Text {i+1}:")
-            print(f"  Verified: {'✅' if is_valid else '❌'}")
-            print(f"  Metadata: {extracted_metadata}")
+    # Use verify_text for combined extraction and verification
+    is_valid, extracted_metadata, clean_text = encoder.verify_text(encoded_text)
+    print(f"Text {i+1}:")
+    if is_valid:
+        print(f"  Verified: ✅")
+        print(f"  Metadata: {extracted_metadata}")
+    else:
+        # Check if metadata was present but failed verification, or simply not present
+        metadata_only, _ = encoder.decode_metadata(encoded_text)
+        if metadata_only:
+            print(f"  Verified: ❌ (Verification Failed)")
+            print(f"  Metadata: {metadata_only}")
         else:
-            print(f"Text {i+1}: Metadata extraction failed: Invalid metadata")
-    except Exception as e:
-        print(f"Text {i+1}: No metadata found or extraction failed - {str(e)}")
+            print(f"  Verified: ❌ (No Metadata Found)")
 ```
 
 ### Error Handling
 
 ```python
 def safe_process_text(text, encoder):
-    """Safely process text with proper error handling."""
+    """Safely process text, attempting verification."""
     result = {
         "has_metadata": False,
         "metadata": None,
@@ -311,16 +293,16 @@ def safe_process_text(text, encoder):
         "error": None
     }
     
+    # Attempt to verify the text using the encoder's key
     try:
-        # Try to extract metadata
-        is_valid, extracted_metadata = encoder.extract_metadata(text)
-        result["has_metadata"] = True
-        result["metadata"] = extracted_metadata
-        
-        # Try to verify the text
-        result["verified"] = is_valid
+        is_valid, metadata, clean_text = encoder.verify_text(text)
+        if metadata: # Metadata was found
+            result["has_metadata"] = True
+            result["metadata"] = metadata
+            result["verified"] = is_valid
+        # If metadata is None, it means no valid encoded block was found
     except Exception as e:
-        # No metadata found or extraction failed
+        # General error during processing
         result["error"] = str(e)
     
     return result
