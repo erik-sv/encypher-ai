@@ -18,8 +18,20 @@ EncypherAI Core provides tools for invisibly encoding metadata (such as model in
 - **Timestamp verification**: Know when text was generated
 - **Custom metadata**: Embed any additional information you need
 - **Streaming support**: Works with both streaming and non-streaming LLM outputs
+- **LLM integrations**: Ready-to-use integrations with OpenAI, Google Gemini, Anthropic Claude, and more
 
 The encoding is done using Unicode variation selectors, which are designed to specify alternative forms of characters without affecting text appearance or readability.
+
+## LLM Integrations
+
+EncypherAI seamlessly integrates with popular LLM providers:
+
+- **OpenAI**: GPT-3.5, GPT-4, and other OpenAI models
+- **Google Gemini**: Gemini 1.5 Flash, Pro, and other Gemini models
+- **Anthropic Claude**: Claude 3 Opus, Sonnet, Haiku, and other Claude models
+- **LiteLLM**: For unified access to multiple LLM providers
+
+Check our [documentation](https://github.com/encypherai/encypher-ai/tree/main/docs/package/integration) for detailed integration examples and code snippets for each provider.
 
 ## Demo Video
 
