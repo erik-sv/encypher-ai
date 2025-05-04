@@ -1,5 +1,6 @@
 # ruff: noqa: E501
 import json
+import os
 import zlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional, Tuple, cast
@@ -7,7 +8,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, cast
 import pytest
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
 
-from encypher.core.crypto_utils import generate_key_pair  # Needed for manual verification check
+from encypher.core.crypto_utils import load_private_key, load_public_key  # Needed for manual verification check
 from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
 
 # --- Test Fixtures ---
@@ -15,14 +16,22 @@ from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
 
 @pytest.fixture(scope="module")
 def key_pair_1() -> Tuple[PrivateKeyTypes, PublicKeyTypes]:
-    """Generate first key pair for tests."""
-    return generate_key_pair()
+    """Load first key pair for tests from .env.test."""
+    priv_pem = os.environ["PRIVATE_KEY_PEM"].replace("\\n", "\n")
+    pub_pem = os.environ["PUBLIC_KEY_PEM"].replace("\\n", "\n")
+    private_key = load_private_key(priv_pem)
+    public_key = load_public_key(pub_pem)
+    return private_key, public_key
 
 
 @pytest.fixture(scope="module")
 def key_pair_2() -> Tuple[PrivateKeyTypes, PublicKeyTypes]:
-    """Generate a second, different key pair for tests."""
-    return generate_key_pair()
+    """Load second key pair for tests from .env.test (reuse same for now)."""
+    priv_pem = os.environ["PRIVATE_KEY_PEM"].replace("\\n", "\n")
+    pub_pem = os.environ["PUBLIC_KEY_PEM"].replace("\\n", "\n")
+    private_key = load_private_key(priv_pem)
+    public_key = load_public_key(pub_pem)
+    return private_key, public_key
 
 
 @pytest.fixture
@@ -109,7 +118,13 @@ def public_key_provider(key_pair_1, key_pair_2) -> Callable[[str], Optional[Publ
 
 def decode_and_deserialize(text: str) -> Optional[Dict[str, Any]]:
     """Helper to extract bytes, decompress, and deserialize for inspection."""
-    raw_bytes = UnicodeMetadata.extract_bytes(text)
+    # --- Updated ZWSP/ZWNJ Extraction --- 
+    binary_string = UnicodeMetadata._extract_binary_string_from_zw_chars(text)
+    if not binary_string:
+        return None
+    raw_bytes = UnicodeMetadata._binary_string_to_bytes(binary_string)
+    # --- End Update --- 
+    # raw_bytes = UnicodeMetadata.extract_bytes(text) # Deprecated VS logic
     if not raw_bytes:
         return None
     try:
@@ -168,18 +183,6 @@ class TestUnicodeMetadata:
         # Add debug information
         print(f"\nEmbedded text length: {len(embedded_text)}")
         print(f"Original text length: {len(sample_text)}")
-
-        # Extract bytes for debugging
-        extracted_bytes = UnicodeMetadata.extract_bytes(embedded_text)
-        print(f"Extracted bytes length: {len(extracted_bytes)}")
-
-        # Try to decode the extracted bytes
-        try:
-            outer_data_str = extracted_bytes.decode("utf-8")
-            outer_data = json.loads(outer_data_str)
-            print(f"Outer data: {outer_data.keys()}")
-        except Exception as e:
-            print(f"Error decoding extracted bytes: {e}")
 
         extracted_payload, is_valid, extracted_signer_id = UnicodeMetadata.verify_and_extract_metadata(embedded_text, public_key_provider)
 
@@ -596,3 +599,144 @@ class TestUnicodeMetadata:
             "We sincerely hope this greatly extended version provides more than ample space for all test cases. Let's add one more: 987-654-3210. Success? We hope so..."  # noqa: E501
         )
         return f"{paragraph1}\n\n{paragraph2}\n\n{paragraph3}"  # noqa: E501
+
+    from tests.integration.test_llm_outputs import STREAMING_CHUNKS # Import test data
+
+    def test_embed_extract_openai_chunk_whitespace_single_point(self, key_pair_1):
+        """Tests embedding/extraction specifically on the problematic OpenAI chunk 1 scenario."""
+        private_key, public_key = key_pair_1
+        signer_id = "test_signer_complex"
+        original_text = STREAMING_CHUNKS['openai'][0] # The problematic long chunk
+        payload_dict = {"user_id": "user_123", "session_id": "session_abc", "timestamp": 1678886400}
+        target = MetadataTarget.WHITESPACE
+        distribute = False # Force single-point insertion
+
+        print(f"\n--- Testing OpenAI Chunk 1 (Whitespace, Single-Point) ---")
+        print(f"Original Text Length: {len(original_text)}")
+
+        # Embed
+        try:
+            embedded_text = UnicodeMetadata.embed_metadata(
+                text=original_text,
+                private_key=private_key,
+                signer_id=signer_id,
+                payload_data=payload_dict,
+                target=target,
+                distribute_across_targets=distribute,
+                payload_type="basic"
+            )
+            print(f"Embedded Text Length: {len(embedded_text)}")
+
+            # --- DEBUG: Print snippet around the first whitespace --- 
+            first_whitespace_index = -1
+            for i, char in enumerate(original_text):
+                if char.isspace():
+                    first_whitespace_index = i
+                    break
+            if first_whitespace_index != -1:
+                start_print = max(0, first_whitespace_index - 20)
+                # Estimate end based on expected marker/payload length (crude)
+                end_print = first_whitespace_index + 1 + 500 # Print first whitespace + 1 (insertion point) + estimate
+                print(f"Snippet around first whitespace (index {first_whitespace_index}) after embedding:\n'''{embedded_text[start_print:end_print]}'''")
+            else:
+                print("Could not find first whitespace in original text for debug snippet.")
+            # --- END DEBUG --- 
+
+        except Exception as e:
+            pytest.fail(f"Embedding failed unexpectedly: {e}")
+
+        # Verify
+        def public_key_provider(s_id):
+            if s_id == signer_id:
+                return public_key
+            return None
+
+        try:
+            extracted_payload, is_valid, extracted_signer_id = UnicodeMetadata.verify_and_extract_metadata(
+                text=embedded_text,
+                public_key_provider=public_key_provider
+            )
+        except Exception as e:
+            pytest.fail(f"Verification/Extraction failed unexpectedly: {e}")
+
+        # Assertions
+        assert is_valid is True, "Signature verification failed"
+        assert extracted_signer_id == signer_id, f"Expected signer ID {signer_id}, got {extracted_signer_id}"
+        assert isinstance(extracted_payload, BasicPayload), "Extracted payload is not BasicPayload"
+        assert extracted_payload.data == payload_dict, "Extracted payload data does not match original"
+        print("--- Test Passed ---")
+
+    def test_binary_string_conversion():
+        """Tests the conversion between binary strings and ZWSP/ZWNJ characters."""
+        # Test cases
+        test_cases = [
+            ("", []),
+            ("0", [0]),
+            ("1", [1]),
+            ("10", [1, 0]),
+            ("11111111", [255]),
+            ("10000000", [128]),
+            ("01111111", [127]),
+            ("10101010", [170]),
+            ("11001100", [204]),
+            ("11110000", [240]),
+            ("00001111", [15]),
+            ("00110011", [51]),
+            ("01010101", [85]),
+            ("01101010", [106]),
+            ("10010101", [149]),
+            ("10100110", [166]),
+            ("11001001", [209]),
+            ("11100111", [231]),
+            ("00010001", [17]),
+            ("00100010", [34]),
+            ("01000011", [67]),
+            ("01100001", [97]),
+            ("10000010", [130]),
+            ("10100000", [160]),
+            ("11000001", [193]),
+            ("11100000", [224]),
+            ("00001001", [9]),
+            ("00100100", [36]),
+            ("01000111", [71]),
+            ("01100101", [101]),
+            ("10000110", [134]),
+            ("10100100", [164]),
+            ("11000101", [197]),
+            ("11100100", [228]),
+            ("00000101", [5]),
+            ("00100001", [33]),
+            ("01000011", [67]),
+            ("01100001", [97]),
+            ("10000010", [130]),
+            ("10100000", [160]),
+            ("11000001", [193]),
+            ("11100000", [224]),
+            ("00000011", [3]),
+            ("00100000", [32]),
+            ("01000001", [65]),
+            ("01100000", [96]),
+            ("10000000", [128]),
+            ("10100000", [160]),
+            ("11000000", [192]),
+            ("11100000", [224]),
+            ("00000001", [1]),
+            ("00100000", [32]),
+            ("01000000", [64]),
+            ("01100000", [96]),
+            ("10000000", [128]),
+            ("10100000", [160]),
+            ("11000000", [192]),
+            ("11100000", [224]),
+        ]
+
+        for binary_string, expected_bytes in test_cases:
+            # Convert binary string to bytes
+            bytes_from_binary = UnicodeMetadata._binary_string_to_bytes(binary_string)
+            assert bytes_from_binary == bytes(expected_bytes), f"Expected {expected_bytes}, got {bytes_from_binary}"
+
+            # Convert bytes back to binary string
+            binary_from_bytes = UnicodeMetadata._bytes_to_binary_string(bytes_from_binary)
+            assert binary_from_bytes == binary_string, f"Expected {binary_string}, got {binary_from_bytes}"
+
+    # --- ZWSP/ZWNJ Specific Tests ---

@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union, c
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import dh, dsa, ec, ed448, ed25519, rsa, x448, x25519
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
 from deprecated import deprecated
 
@@ -31,6 +31,7 @@ class UnicodeMetadata:
     variation selectors.
     """
 
+    # --- Character Constants ---
     # Variation selectors block (VS1-VS16: U+FE00 to U+FE0F)
     VARIATION_SELECTOR_START: int = 0xFE00
     VARIATION_SELECTOR_END: int = 0xFE0F
@@ -38,6 +39,20 @@ class UnicodeMetadata:
     # Variation selectors supplement (VS17-VS256: U+E0100 to U+E01EF)
     VARIATION_SELECTOR_SUPPLEMENT_START: int = 0xE0100
     VARIATION_SELECTOR_SUPPLEMENT_END: int = 0xE01EF
+
+    # Zero-Width Characters (New approach)
+    ZWSP = '\u200B'  # Zero-Width Space (Represents bit '1')
+    ZWNJ = '\u200C'  # Zero-Width Non-Joiner (Represents bit '0')
+
+    # Map bits to characters
+    BIT_TO_CHAR = {'1': ZWSP, '0': ZWNJ}
+    # Map characters back to bits
+    CHAR_TO_BIT = {ZWSP: '1', ZWNJ: '0'}
+
+    # --- Start/End Markers ---
+    # Using sequences unlikely to appear naturally in payload bits
+    START_MARKER_BIN = "11111111" # 8 ZWSPs
+    END_MARKER_BIN = "00000000"   # 8 ZWNJs
 
     # Regular expressions for different target types
     REGEX_PATTERNS: Dict[MetadataTarget, re.Pattern] = {
@@ -51,7 +66,7 @@ class UnicodeMetadata:
     @classmethod
     def to_variation_selector(cls, byte: int) -> Optional[str]:
         """
-        Convert a byte to a variation selector character
+        (Deprecated: Use ZWSP/ZWNJ approach) Convert a byte to a variation selector character
 
         Args:
             byte: Byte value (0-255)
@@ -69,7 +84,7 @@ class UnicodeMetadata:
     @classmethod
     def from_variation_selector(cls, code_point: int) -> Optional[int]:
         """
-        Convert a variation selector code point to a byte
+        (Deprecated: Use ZWSP/ZWNJ approach) Convert a variation selector code point to a byte
 
         Args:
             code_point: Unicode code point
@@ -148,7 +163,7 @@ class UnicodeMetadata:
     @classmethod
     def extract_bytes(cls, text: str) -> bytes:
         """
-        Extract bytes from Unicode variation selectors
+        (Deprecated: Use ZWSP/ZWNJ approach) Extract bytes from Unicode variation selectors
 
         Args:
             text: Text with embedded variation selectors
@@ -267,12 +282,15 @@ class UnicodeMetadata:
         else:
             raise TypeError("'target' must be a string or MetadataTarget enum member.")
 
-        pattern = cls.REGEX_PATTERNS[target_enum]
-        matches = pattern.finditer(text)
-
-        indices = []
-        for match in matches:
-            indices.append(match.start())
+        # Use a try-except block for regex compilation robustness
+        try:
+            pattern = re.compile(cls.REGEX_PATTERNS[target_enum])
+            matches = pattern.finditer(text)
+            # Extract start indices, ensuring no duplicates if patterns overlap (unlikely but safe)
+            indices = sorted(list({match.start() for match in matches}))
+        except re.error as e:
+            logger.error(f"Regex error for target '{target_enum.name}': {e}")
+            raise ValueError(f"Invalid regex pattern for target '{target_enum.name}'.") from e
 
         return indices
 
@@ -293,52 +311,8 @@ class UnicodeMetadata:
         custom_claims: Optional[Dict[str, Any]] = None,
         distribute_across_targets: bool = False,
     ) -> str:
-        """
-        Embed metadata into text using Unicode variation selectors, signing with a private key.
-
-        When using 'manifest' format, this method implements a C2PA-inspired approach for
-        content provenance and authenticity, adapted specifically for plain-text environments
-        where traditional file-based embedding methods aren't applicable. The manifest structure
-        parallels C2PA's concepts of assertions, claim generators, and cryptographic integrity.
-
-        Args:
-            text: The text to embed metadata into.
-            private_key: The Ed25519 private key object for signing.
-            signer_id: A string identifying the signer/key pair (used for
-                       verification lookup).
-            metadata_format: The format for the metadata payload ('basic' or 'manifest').
-                             Default is 'basic'. When set to 'manifest', uses a
-                             C2PA-inspired structured format.
-            model_id: Model identifier (used in 'basic' and optionally in
-                      'manifest' ai_info).
-            timestamp: Timestamp (datetime, ISO string, int/float epoch). Stored as
-                       ISO 8601 UTC string.
-                       **This field is mandatory.**
-            target: Where to embed metadata ('whitespace', 'punctuation', etc.,
-                    or MetadataTarget enum).
-            custom_metadata: Dictionary for custom fields (used in 'basic' payload).
-            claim_generator: Claim generator string (used in 'manifest' format).
-                             Similar to C2PA's concept of identifying the
-                             software/tool that generated the claim.
-            actions: List of action dictionaries (used in 'manifest' format).
-                     Conceptually similar to C2PA assertions about operations
-                     performed on the content.
-            ai_info: Dictionary with AI-specific info (used in 'manifest' format).
-                     Represents a custom assertion type focused on AI-specific
-                     attributes.
-            custom_claims: Dictionary for custom C2PA-like claims (used in
-                           'manifest' format).
-            distribute_across_targets: If True, distribute bits across multiple
-                                       targets if needed.
-
-        Returns:
-            The text with embedded metadata and digital signature.
-
-        Raises:
-            ValueError: If 'timestamp' is not provided, if the target is invalid,
-                        if not enough embedding locations are found, or if the
-                        metadata + signature is too large.
-        """
+        # DEBUG: Print the type of private_key for troubleshooting
+        print(f"[DEBUG] embed_metadata: type(private_key) = {type(private_key)}")
         logger.debug(
             f"embed_metadata called with text (type={type(text).__name__}), signer_id='{signer_id}', "
             f"format='{metadata_format}', target='{target}', distribute={distribute_across_targets}"
@@ -347,7 +321,7 @@ class UnicodeMetadata:
         if not isinstance(text, str):
             logger.error("Input validation failed: 'text' is not a string.")
             raise TypeError("Input text must be a string")
-        if not isinstance(private_key, Ed25519PrivateKey):
+        if not isinstance(private_key, ed25519.Ed25519PrivateKey):
             # Note: PrivateKeyTypes is broader, but we specifically need Ed25519 here for signing.
             logger.error("Input validation failed: 'private_key' is not an Ed25519PrivateKey instance.")
             raise TypeError("Input 'private_key' must be an Ed25519PrivateKey instance.")
@@ -361,219 +335,144 @@ class UnicodeMetadata:
             raise ValueError("A 'timestamp' must be provided for metadata embedding.")
 
         # Validate target
+        _target_enum = MetadataTarget.WHITESPACE  # Initialize with default
         if target is None:
-            pass  # Keep track of the enum value
-        elif isinstance(target, MetadataTarget):
             pass
+        elif isinstance(target, MetadataTarget):
+            _target_enum = target
         elif isinstance(target, str):
             try:
-                MetadataTarget(target.lower())  # Convert string to enum
+                _target_enum = MetadataTarget(target.lower())  # Convert string to enum
             except ValueError:
                 valid_targets = [t.name for t in MetadataTarget]
                 logger.error(f"Invalid target: {target}. Must be one of {valid_targets}.")
                 raise ValueError(f"Invalid target: {target}. Must be one of {valid_targets}.")
         else:
-            logger.error("'target' must be a string or MetadataTarget enum member.")
-            raise TypeError("'target' must be a string or MetadataTarget enum member.")
+             raise TypeError(f"Invalid target type: {type(target)}. Must be string or MetadataTarget enum.")
+        # --- End Input Validation ---
 
-        if metadata_format not in ("basic", "manifest"):
-            logger.error("metadata_format must be 'basic' or 'manifest'.")
-            raise ValueError("metadata_format must be 'basic' or 'manifest'.")
+        # 1. Prepare Inner Payload:
+        formatted_timestamp = cls._format_timestamp(timestamp)
 
-        if model_id is not None and not isinstance(model_id, str):
-            logger.error("If provided, 'model_id' must be a string.")
-            raise TypeError("If provided, 'model_id' must be a string.")
+        # Warn if custom keys overlap with standard keys
+        standard_keys = {"format", "signer_id", "timestamp"} | (set(custom_claims.keys()) if custom_claims else set())
+        overlapping_keys = set(custom_metadata.keys()) & standard_keys if custom_metadata else set()
+        if overlapping_keys:
+            logger.warning(f"Custom metadata keys overlap with standard keys: {overlapping_keys}")
 
-        if not isinstance(distribute_across_targets, bool):
-            logger.error("'distribute_across_targets' must be a boolean.")
-            raise TypeError("'distribute_across_targets' must be a boolean.")
-
-        # Convert timestamp
-        try:
-            iso_timestamp = cls._format_timestamp(timestamp)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Timestamp error: {e}", exc_info=True)
-            raise ValueError(f"Timestamp error: {e}")
-
-        payload_data: Dict[str, Any]  # Use Dict[str, Any] for flexible construction
-
-        if metadata_format == "basic":
-            logger.debug("Using 'basic' metadata format.")
-            payload_data = {
-                "signer_id": signer_id,
-                "timestamp": iso_timestamp,
-                "format": metadata_format,  # Explicitly include format
-            }
-            if model_id:
-                payload_data["model_id"] = model_id
-            if custom_metadata:
-                # Merge custom metadata, ensuring no overlaps with standard keys
-                standard_keys = {"signer_id", "timestamp", "format", "model_id"}
-                if any(key in standard_keys for key in custom_metadata):
-                    logger.warning("Custom metadata keys overlap with standard keys.")
-                    # Prioritize standard keys; filter out overlaps from custom
-                    filtered_custom = {k: v for k, v in custom_metadata.items() if k not in standard_keys}
-                    payload_data["custom_metadata"] = filtered_custom
-                else:
-                    payload_data["custom_metadata"] = custom_metadata
-        elif metadata_format == "manifest":
-            logger.debug("Using 'manifest' metadata format.")
-            # Ensure timestamp is in the correct format
-            iso_timestamp = cls._format_timestamp(timestamp)
-
-            # 1. Construct the main payload structure
-            payload_data = {
-                "signer_id": signer_id,
-                "timestamp": iso_timestamp,
-                "format": metadata_format,  # Keep format for clarity
-            }
-
-            # 2. Construct the inner manifest dictionary
-            inner_manifest: Dict[str, Any] = {}
-            if claim_generator:
-                inner_manifest["claim_generator"] = claim_generator
-            if actions:
-                inner_manifest["actions"] = actions
-            if ai_info:
-                inner_manifest["ai_info"] = ai_info
-            if custom_claims:
-                inner_manifest["custom_claims"] = custom_claims
-            if model_id:  # Optionally include model_id within manifest
-                # Decide where it fits best, e.g., under ai_info or top-level
-                if "ai_info" not in inner_manifest:
-                    inner_manifest["ai_info"] = {}
-                inner_manifest["ai_info"]["model_id"] = model_id
-
-            # 3. **Crucial Change:** Add the inner manifest dictionary directly
-            #    Do NOT serialize the inner manifest separately here.
-            payload_data["manifest"] = inner_manifest  # Add the dict, not serialized bytes
-
-        else:
-            logger.error(f"Unsupported metadata_format: {metadata_format}")
-            raise ValueError(f"Unsupported metadata_format: {metadata_format}")
-
-        # --- End: Payload Construction ---
-
-        # --- Start: Signing ---
-        try:
-            # Serialize the *complete* payload (basic or manifest) just once
-            # Use dict() to ensure we are working with a copy if needed and handle payload_data type
-            canonical_payload_bytes = serialize_payload(dict(payload_data))
-            signature = sign_payload(private_key, canonical_payload_bytes)
-            # Use URL-safe base64 encoding without padding for embedding
-            signature_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
-            logger.debug(f"Payload signed successfully. Signature (base64): {signature_b64[:10]}...")
-        except Exception as e:
-            logger.exception("Failed to sign the metadata payload.")
-            # Propagate the error, as signing failure is critical
-            raise RuntimeError(f"Failed to sign metadata payload: {e}") from e
-        # --- End: Signing ---
-
-        # --- Start: Combine Payload and Signature for Embedding ---
-        # Combine the payload dictionary, signature, signer_id, and format
-        # into the structure expected by the extractor.
-        outer_payload_to_embed = {
-            "payload": payload_data,  # Embed the dictionary structure
-            "signature": signature_b64,
-            "signer_id": signer_id,  # Add signer_id to the top level
-            "format": metadata_format,  # Add format to the top level
-        }
-
-        # 6. Serialize the Outer Object:
-        try:
-            outer_bytes = serialize_payload(dict(outer_payload_to_embed))
-        except Exception as e:
-            logger.error(f"Failed to serialize outer payload: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to serialize outer payload: {e}")
-
-        logger.debug(f"Serialized outer payload size: {len(outer_bytes)} bytes")
-
-        # 7. Convert Outer Bytes to Variation Selectors:
-        try:
-            selector_chars = cls._bytes_to_variation_selectors(outer_bytes)
-        except ValueError as e:
-            # Handle potential errors from the helper
-            logger.error(f"Failed to convert metadata bytes to selectors: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to convert metadata bytes to selectors: {e}")
-
-        if not selector_chars:
-            # Nothing to embed, return original text
-            return text
-
-        # 9. Find Embedding Targets:
-        # Use the existing find_targets, but ensure target is passed correctly
-        embedding_target = target if target is not None else MetadataTarget.WHITESPACE
-        try:
-            # find_targets now returns list of indices
-            target_indices = cls.find_targets(text, embedding_target)
-        except ValueError as e:
-            # Propagate errors from find_targets (e.g., invalid target string)
-            logger.error(f"Failed to find embedding targets: {e}", exc_info=True)
-            raise ValueError(f"Failed to find embedding targets: {e}")
-
-        target_display = embedding_target.value if hasattr(embedding_target, "value") else embedding_target
-        logger.debug(f"Found {len(target_indices)} potential embedding targets using '{target_display}'.")
-
-        # 10. Check if at least one target was found & Embed Selectors into Text:
-        if not target_indices:
-            err_msg = (
-                f"No suitable targets found in text using target '{target_display}'. "
-                f"Need at least one target to embed metadata of length {len(selector_chars)}."
+        if metadata_format == "manifest":
+            inner_payload: Union[BasicPayload, ManifestPayload] = ManifestPayload(
+                format=metadata_format,
+                signer_id=signer_id,
+                timestamp=formatted_timestamp,
+                claim_generator=claim_generator,
+                actions=actions,
+                ai_info=ai_info,
+                custom_claims=custom_claims,
             )
-            logger.error(err_msg)
-            raise ValueError(err_msg)
+        else:  # Default to basic format
+            inner_payload = BasicPayload(
+                format="basic",
+                signer_id=signer_id,
+                timestamp=formatted_timestamp,
+                model_id=model_id,
+                custom_metadata=custom_metadata,
+            )
+
+        # 2. Serialize Inner Payload:
+        try:
+            inner_payload_bytes = serialize_payload(inner_payload)
+        except Exception as e:
+            logger.error(f"Error serializing inner payload: {e}", exc_info=True)
+            raise ValueError(f"Error serializing inner payload: {e}") from e
+
+        # 3. Sign Payload:
+        try:
+            signature_bytes = sign_payload(private_key, inner_payload_bytes)
+            logger.info(f"Successfully signed payload (signature length: {len(signature_bytes)} bytes).")
+        except Exception as e:
+            logger.error(f"Error signing payload: {e}", exc_info=True)
+            raise ValueError(f"Error signing payload: {e}") from e
+
+        # 4. Create Outer Payload:
+        outer_payload = OuterPayload(
+            payload=inner_payload, signature=base64.urlsafe_b64encode(signature_bytes).decode("ascii")
+        )
+        outer_payload_bytes = serialize_payload(outer_payload)
+
+        # --- NEW: Convert outer payload bytes to ZW chars ---
+        # 5. Convert Outer Payload Bytes to Binary String:
+        binary_string = cls._bytes_to_binary_string(outer_payload_bytes)
+
+        # 6. Convert Binary String to ZWSP/ZWNJ Characters:
+        metadata_chars = cls._binary_string_to_zw_chars(binary_string)
+
+        # --- NEW: Add Start/End Markers --- 
+        start_marker_chars = cls._binary_string_to_zw_chars(cls.START_MARKER_BIN)
+        end_marker_chars = cls._binary_string_to_zw_chars(cls.END_MARKER_BIN)
+        full_metadata_chars = start_marker_chars + metadata_chars + end_marker_chars
+        # ----------------------------------
+
+        # 7. Find Embedding Targets:
+        target_indices = cls.find_targets(text, _target_enum)
+
+        # Check if enough targets exist
+        if len(target_indices) < len(full_metadata_chars):
+            error_msg = (
+                f"Not enough embeddable targets found in text for the required metadata size. "
+                f"Required: {len(full_metadata_chars)}, Found: {len(target_indices)} for target type '{_target_enum.name}'."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # 8. Embed Metadata Characters:
+        text_list = list(text)
+        chars_inserted = 0
+        if distribute_across_targets:
+            # Use targets needed for the full sequence including markers
+            targets_to_use = target_indices[: len(full_metadata_chars)]
+        else:
+            # Embed all at the first target (if possible)
+            targets_to_use = [target_indices[0]] * len(full_metadata_chars)
+            # Check if embedding location is valid (not split mid-surrogate pair)
+            first_target_index = target_indices[0]
+            if 0 < first_target_index < len(text) and \
+               0xD800 <= ord(text[first_target_index - 1]) <= 0xDBFF and \
+               0xDC00 <= ord(text[first_target_index]) <= 0xDFFF:
+                 raise ValueError("Embedding target index splits a surrogate pair, which is invalid.")
+
+        # Sort targets in reverse to avoid messing up indices during insertion
+        targets_to_use.sort(reverse=True)
+
+        # Assign metadata chars to targets (reversed for insertion)
+        full_metadata_chars_reversed = full_metadata_chars[::-1]
+
+        current_target_index = -1
+        inserted_count_at_target = 0
 
         if distribute_across_targets:
-            # Original approach: distribute across multiple targets
-            if len(target_indices) < len(selector_chars):
-                err_msg = (
-                    f"Not enough targets ({len(target_indices)}) found in text "
-                    f"to embed metadata of length {len(selector_chars)} "
-                    f"using target '{target_display}'. Required: {len(selector_chars)}."
-                )
-                logger.error(err_msg)
-                raise ValueError(err_msg)
-
-            # Build the result string with interleaved selectors
-            result_parts = []
-            last_text_idx = 0
-            selector_idx = 0
-
-            # Sort targets by index to process text sequentially
-            target_indices.sort()
-
-            for target_idx in target_indices:
-                if selector_idx < len(selector_chars):
-                    # Add text segment before the target insertion point
-                    result_parts.append(text[last_text_idx:target_idx])
-                    # Add the target character followed by the variation selector
-                    result_parts.append(text[target_idx])
-                    result_parts.append(selector_chars[selector_idx])
-                    # Update indices
-                    last_text_idx = target_idx + 1  # Skip the original character at target_idx
-                    selector_idx += 1
-                else:
-                    # Once all data is embedded, stop processing targets
-                    break
-
-            # Add any remaining text after the last embedding point
-            result_parts.append(text[last_text_idx:])
-            result = "".join(result_parts)
-            logger.info(f"Successfully embedded metadata (distributed) for signer '{signer_id}'.")
-            return result
+            for i, target_index in enumerate(targets_to_use):
+                char_to_insert = full_metadata_chars_reversed[i]
+                # Insert *after* the target character index
+                text_list.insert(target_index + 1, char_to_insert)
+                chars_inserted += 1
         else:
-            # New default approach: embed all metadata after the first target
-            target_idx = target_indices[0]
+            # Insert all chars after the first target index
+            first_target_index = targets_to_use[0] # All elements are the same
+            for char_to_insert in full_metadata_chars_reversed:
+                 text_list.insert(first_target_index + 1, char_to_insert)
+            chars_inserted = len(full_metadata_chars)
 
-            # Build the result string with all selectors after the first target character
-            # Keep the target character and add all selectors immediately after it
-            result = text[: target_idx + 1] + "".join(selector_chars) + text[target_idx + 1 :]
-            logger.info(f"Successfully embedded metadata (single-point) for signer '{signer_id}'.")
-            return result
+        logger.info(
+            f"Successfully embedded {chars_inserted} metadata characters (incl. markers) "
+            f"({'distributed' if distribute_across_targets else 'single-point'}) for signer '{signer_id}'."
+        )
+        return "".join(text_list)
 
     @classmethod
     def _bytes_to_variation_selectors(cls, data: bytes) -> List[str]:
-        """Convert bytes into a list of Unicode variation selector characters."""
+        """(Deprecated: Use ZWSP/ZWNJ approach) Convert bytes into a list of Unicode variation selector characters."""
+        # Keep this method for now, but mark as deprecated or remove later
         selectors = [cls.to_variation_selector(byte) for byte in data]
         valid_selectors = [s for s in selectors if s is not None]
         if len(valid_selectors) != len(data):
@@ -581,6 +480,117 @@ class UnicodeMetadata:
             logger.error("Invalid byte value encountered during selector conversion.")
             raise ValueError("Invalid byte value encountered during selector conversion.")
         return valid_selectors
+
+    @classmethod
+    def _bytes_to_binary_string(cls, data: bytes) -> str:
+        """Convert bytes to a string of '0's and '1's."""
+        return "".join(format(byte, '08b') for byte in data)
+
+    @classmethod
+    def _binary_string_to_bytes(cls, bin_string: str) -> bytes:
+        """Convert a string of '0's and '1's back to bytes."""
+        if len(bin_string) % 8 != 0:
+            # This might happen if extraction was incomplete or data corrupted
+            logger.warning(f"Binary string length {len(bin_string)} is not a multiple of 8. Padding or truncation might occur.")
+            # Optional: Pad with '0's to the nearest multiple of 8, or raise error
+            # For now, let's proceed, but be aware of potential issues.
+
+        byte_list = []
+        for i in range(0, len(bin_string), 8):
+            byte_str = bin_string[i:i+8]
+            if len(byte_str) < 8:
+                 # Handle potential padding if needed, or log warning if unexpected
+                 logger.warning(f"Incomplete byte '{byte_str}' at end of binary string. Skipping.")
+                 continue # Or pad: byte_str = byte_str.ljust(8, '0')
+            try:
+                byte_list.append(int(byte_str, 2))
+            except ValueError:
+                logger.error(f"Invalid binary segment encountered: '{byte_str}'. Cannot convert to byte.")
+                # Decide how to handle: raise error, skip, return partial? Returning empty for now.
+                return b""
+        return bytes(byte_list)
+
+    @classmethod
+    def _binary_string_to_zw_chars(cls, bin_string: str) -> List[str]:
+        """Convert a binary string ('0's and '1's) to a list of ZWSP/ZWNJ characters."""
+        zw_chars = [cls.BIT_TO_CHAR.get(bit) for bit in bin_string]
+        # Filter out None in case of unexpected characters in bin_string (shouldn't happen)
+        valid_zw_chars = [ch for ch in zw_chars if ch is not None]
+        if len(valid_zw_chars) != len(bin_string):
+            logger.error("Invalid bit encountered during ZW character conversion.")
+            raise ValueError("Invalid bit encountered during ZW character conversion.")
+        return valid_zw_chars
+
+    @classmethod
+    def _extract_binary_string_from_zw_chars(cls, text: str) -> str:
+        """Extract a binary string ('0's and '1's) from ZWSP/ZWNJ characters embedded in text."""
+
+        start_marker_zw_list = cls._binary_string_to_zw_chars(cls.START_MARKER_BIN)
+        end_marker_zw_list = cls._binary_string_to_zw_chars(cls.END_MARKER_BIN)
+        len_start = len(start_marker_zw_list)
+        len_end = len(end_marker_zw_list)
+
+        extracted_payload_zw_list = []
+        current_match_buffer = []
+        state = "LOOKING_FOR_START"  # LOOKING_FOR_START, COLLECTING_PAYLOAD, FINISHED
+
+        for char_index, char in enumerate(text):
+            is_zw_char = char in cls.CHAR_TO_BIT
+
+            if not is_zw_char:
+                # Non-ZW character resets any partial marker match when looking for start
+                if state == "LOOKING_FOR_START":
+                    current_match_buffer = []
+                continue  # Ignore non-ZW chars mostly
+
+            # Add current ZW char to buffer
+            current_match_buffer.append(char)
+
+            if state == "LOOKING_FOR_START":
+                # Check if buffer ends with start marker
+                if len(current_match_buffer) >= len_start:
+                    if current_match_buffer[-len_start:] == start_marker_zw_list:
+                        logger.info(f"[_extract_binary_string STATE] Found start marker ending at text index {char_index}.")
+                        state = "COLLECTING_PAYLOAD"
+                        current_match_buffer = []  # Clear buffer, start collecting payload
+                    # Keep buffer size limited if not matching
+                    elif len(current_match_buffer) > len_start:
+                        current_match_buffer.pop(0)
+
+            elif state == "COLLECTING_PAYLOAD":
+                # Check if buffer ends with end marker
+                if len(current_match_buffer) >= len_end:
+                    if current_match_buffer[-len_end:] == end_marker_zw_list:
+                        logger.info(f"[_extract_binary_string STATE] Found end marker ending at text index {char_index}.")
+                        # Payload is everything collected *before* the end marker started matching
+                        # The buffer currently holds payload + end_marker
+                        extracted_payload_zw_list.extend(current_match_buffer[:-len_end])
+                        state = "FINISHED"
+                        break  # Found payload, stop scanning
+                    else:
+                        # Buffer is full enough to check, but didn't match end marker.
+                        # Add the oldest char from buffer to payload, remove it from buffer.
+                        extracted_payload_zw_list.append(current_match_buffer.pop(0))
+                # else: Buffer not full enough to check for end marker yet, character was added above.
+
+        if state != "FINISHED":
+            logger.warning("Extraction scan finished without finding complete start->payload->end sequence.")
+            return ""
+
+        # Convert collected ZW chars (payload only) to binary string
+        binary_string_list = []
+        for char in extracted_payload_zw_list:
+            bit = cls.CHAR_TO_BIT.get(char) # Should always be found if logic is correct
+            if bit:
+                binary_string_list.append(bit)
+            else:
+                # This indicates an issue, maybe non-ZW char crept in?
+                logger.error(f"Non-ZW char found in collected payload sequence: {ord(char)}. This shouldn't happen.")
+                return "" # Or raise error
+
+        final_binary_string = "".join(binary_string_list)
+        logger.info(f"[_extract_binary_string STATE] Returning Binary String (len={len(final_binary_string)}) based on state machine.")
+        return final_binary_string
 
     @classmethod
     def verify_and_extract_metadata(
@@ -594,10 +604,9 @@ class UnicodeMetadata:
         and returns the payload, verification status, and signer ID.
 
         This verification process implements a C2PA-inspired approach for content
-        authenticity verification, adapted specifically for plain-text environments.
-        Similar to how C2PA verifies digital signatures in media files to establish
-        provenance and integrity, this method verifies cryptographic signatures
-        embedded directly within text using Unicode variation selectors.
+        authenticity verification, adapted specifically for plain-text environments
+        where traditional file-based embedding methods aren't applicable. The manifest structure
+        parallels C2PA's concepts of assertions, claim generators, and cryptographic integrity.
 
         Args:
             text: Text potentially containing embedded metadata.
@@ -625,6 +634,7 @@ class UnicodeMetadata:
         logger.debug(f"verify_and_extract_metadata called for text (len={len(text)}).")
         # 1. Extract Outer Payload:
         outer_payload = cls._extract_outer_payload(text)
+        logger.info(f"[verify_and_extract DEBUG] Extracted Outer Payload Dict: {outer_payload}")
         if outer_payload is None:
             logger.debug("No outer payload found during extraction.")
             return None, False, None
@@ -752,54 +762,46 @@ class UnicodeMetadata:
 
     @classmethod
     def _extract_outer_payload(cls, text: str) -> Optional[OuterPayload]:
-        """Extracts the raw OuterPayload dict from embedded bytes.
-
-        Finds the metadata markers, extracts the embedded bytes, decodes the
-        outer JSON structure, and returns the OuterPayload TypedDict if valid.
-
-        Args:
-            text: The text containing potentially embedded metadata.
-
-        Returns:
-            The extracted OuterPayload dictionary if found and successfully parsed,
-            otherwise None.
-
-        Raises:
-            (Indirectly via called methods) UnicodeDecodeError, json.JSONDecodeError, TypeError
-        """
-        # 1. Extract Bytes:
-        logger.debug("Attempting to extract bytes from text.")
-        outer_bytes = cls.extract_bytes(text)
-        if not outer_bytes:
-            logger.debug("No variation selector bytes found in text.")
+        """Extracts the raw OuterPayload dict from embedded ZWSP/ZWNJ characters."""
+        # --- NEW: Extract using ZWSP/ZWNJ ---
+        # 1. Extract Binary String:
+        binary_string = cls._extract_binary_string_from_zw_chars(text)
+        if not binary_string:
+            logger.debug("No ZWSP/ZWNJ characters found in text.")
             return None
 
-        logger.debug(f"Extracted {len(outer_bytes)} bytes from variation selectors.")
-        # 2. Optional: Decompress Bytes (if compression was added to embed):
-        #    - Check for marker and decompress if needed. (Skipped for now)
+        # 2. Convert Binary String to Bytes:
+        outer_payload_bytes = cls._binary_string_to_bytes(binary_string)
+        if not outer_payload_bytes:
+            logger.warning("Could not convert extracted binary string to bytes.")
+            return None
+        # --- End NEW ---
 
         # 3. Deserialize Outer JSON:
         try:
-            outer_data_str = outer_bytes.decode("utf-8")
-            outer_data = json.loads(outer_data_str)
-            if not isinstance(outer_data, dict):
-                logger.warning("Decoded outer data is not a dictionary.")
+            outer_data = json.loads(outer_payload_bytes.decode("utf-8"))
+
+            # Basic validation for OuterPayload structure
+            if (
+                not isinstance(outer_data, dict)
+                or "payload" not in outer_data
+                or not isinstance(outer_data["payload"], dict)
+                or "signature" not in outer_data
+                or not isinstance(outer_data["signature"], str)
+            ):
+                logger.warning(
+                    "Extracted outer data does not match expected OuterPayload structure."
+                )
                 return None
 
-            # Minimal validation to check required keys for OuterPayload
-            required_keys = ("payload", "signature", "signer_id", "format")
-            if not all(k in outer_data for k in required_keys):
-                missing_keys = [k for k in required_keys if k not in outer_data]
-                logger.warning(f"Extracted outer data missing required keys: {missing_keys}")
-                return None
-
-            logger.debug("Successfully extracted and validated outer payload structure.")
-            # Attempt to cast to TypedDict for structure validation (best effort)
-            # This doesn't deeply validate types within 'payload'
+            # Type cast for static analysis (actual validation happens during use)
             return cast(OuterPayload, outer_data)
 
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as e:
-            logger.warning(f"Failed to decode or parse outer payload JSON: {e}", exc_info=False)  # Less noisy logging
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            logger.error(f"Error decoding/parsing outer payload bytes: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error processing outer payload: {e}", exc_info=True)
             return None
 
     @classmethod
@@ -895,7 +897,7 @@ class UnicodeMetadata:
         version="1.1.0",
         reason="HMAC verification is deprecated. Use Ed25519 digital signatures via the primary verify_metadata method.",
     )
-    def _verify_metadata_hmac_deprecated(cls, text: str, hmac_secret_key: str) -> Tuple[Dict[str, Any], bool]:  # Renamed method
+    def _verify_metadata_hmac_deprecated(cls, text: str, hmac_secret_key: str) -> Tuple[Dict[str, Any], bool]:  
         """
         Verify and extract metadata from text embedded using Unicode variation selectors and an HMAC secret key.
 
@@ -922,13 +924,12 @@ class UnicodeMetadata:
         )
         logger.warning("Deprecated HMAC verify_metadata called.")
 
-        # 1. Extract Bytes:
-        outer_bytes = cls.extract_bytes(text)
+        binary_string = cls._extract_binary_string_from_zw_chars(text)
+        if not binary_string:
+            return {}, False
+        outer_bytes = cls._binary_string_to_bytes(binary_string)
         if not outer_bytes:
             return {}, False
-
-        # 2. Optional: Decompress Bytes (if compression was added to embed):
-        #    - Check for marker and decompress if needed. (Skipped for now)
 
         # 3. Deserialize Outer JSON:
         try:

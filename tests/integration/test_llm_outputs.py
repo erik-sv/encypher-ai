@@ -14,11 +14,16 @@ from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
 from encypher.streaming.handlers import StreamingHandler
 
 # Sample LLM outputs from different providers
+_openai_sample = "The quick brown fox jumps over the lazy dog. This is a sample output from OpenAI's GPT model that demonstrates how text might be formatted, including punctuation, spacing, and paragraph breaks.\n\nMultiple paragraphs might be included in the response, with varying lengths and structures. This helps test the robustness of the metadata encoding system across different text patterns. "
+_anthropic_sample = "Here's what I know about that topic:\n\n1. First, it's important to understand the basic principles.\n2. Second, we should consider the historical context.\n3. Finally, let's examine the practical applications.\n\nIn conclusion, this sample output from Anthropic's Claude model demonstrates different formatting styles including lists and structured content. "
+_gemini_sample = "When considering this question, I'd approach it from multiple angles:\n\n• Technical feasibility\n• Economic implications\n• Ethical considerations\n• Social impact\n\nThis sample from Google's Gemini model includes bullet points and special characters to test encoding resilience. "
+_llama_sample = "To answer your question:\nThe solution involves several steps. First, we need to analyze the problem domain. Second, we should identify potential approaches. Third, we implement the most promising solution.\n\nThis sample from Llama includes line breaks and a structured response format typical of instruction-tuned models. "
+
 SAMPLE_OUTPUTS = {
-    "openai": "The quick brown fox jumps over the lazy dog. This is a sample output from OpenAI's GPT model that demonstrates how text might be formatted, including punctuation, spacing, and paragraph breaks.\n\nMultiple paragraphs might be included in the response, with varying lengths and structures. This helps test the robustness of the metadata encoding system across different text patterns.",
-    "anthropic": "Here's what I know about that topic:\n\n1. First, it's important to understand the basic principles.\n2. Second, we should consider the historical context.\n3. Finally, let's examine the practical applications.\n\nIn conclusion, this sample output from Anthropic's Claude model demonstrates different formatting styles including lists and structured content.",
-    "gemini": "When considering this question, I'd approach it from multiple angles:\n\n• Technical feasibility\n• Economic implications\n• Ethical considerations\n• Social impact\n\nThis sample from Google's Gemini model includes bullet points and special characters to test encoding resilience.",
-    "llama": "To answer your question:\nThe solution involves several steps. First, we need to analyze the problem domain. Second, we should identify potential approaches. Third, we implement the most promising solution.\n\nThis sample from Llama includes line breaks and a structured response format typical of instruction-tuned models.",
+    "openai": _openai_sample * 10,
+    "anthropic": _anthropic_sample * 10,
+    "gemini": _gemini_sample * 10,
+    "llama": _llama_sample * 10,
 }
 
 
@@ -111,16 +116,19 @@ class TestLLMOutputsIntegration:
 
 
 # Sample streaming chunks for different providers
+# NOTE: The first chunk for each provider MUST be long enough to accommodate
+#       the full ZWSP/ZWNJ encoded payload (typically 300-400+ bits/characters),
+#       as the handler is currently configured to encode only the first chunk.
 STREAMING_CHUNKS = {
     "openai": [
-        "The quick brown",
+        ("The quick brown " * 40).strip(), # Ensure ample whitespace
         " fox jumps over",
         " the lazy dog.",
         " This is a sample",
         " output from OpenAI.",
     ],
     "anthropic": [
-        "Here's what I know",
+        ("Here's what I know " * 40).strip(), # Ensure ample whitespace
         " about that topic:",
         "\n\n1. First, it's important",
         " to understand the basic principles.",

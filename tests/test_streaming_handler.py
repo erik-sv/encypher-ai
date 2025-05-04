@@ -52,7 +52,7 @@ class TestStreamingHandler:
         )
 
         # Process a chunk
-        chunk = "This is a test chunk with spaces."
+        chunk = ("This is a test chunk with spaces. " * 20).strip()
         processed_chunk = handler.process_chunk(chunk)
 
         # Ensure the chunk is modified (metadata added)

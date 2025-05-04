@@ -13,11 +13,12 @@ from cryptography.hazmat.primitives.asymmetric import dh, dsa, ec, ed448, ed2551
 # Import necessary types for signature handling
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 
-from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
+from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata, BasicPayload, ManifestPayload, OuterPayload, serialize_payload, sign_payload
 
 # Import logger using relative path
 from ..core.logging_config import logger
 
+import base64
 
 class StreamingHandler:
     """
@@ -117,20 +118,60 @@ class StreamingHandler:
 
     def _has_sufficient_targets(self, text: str) -> bool:
         """
-        Check if the text has at least one suitable target for embedding metadata.
-
-        Args:
-            text: Text to check for targets
-
-        Returns:
-            True if at least one suitable target is found, False otherwise
+        Check if the text has enough target characters for the metadata payload.
+        Estimates size based on payload, does not perform full embedding.
         """
+        if not self.metadata or not self.private_key or not self.signer_id:
+            return True  # No embedding needed
+
         try:
-            # Use the find_targets method to check if there's at least one target
-            target_indices = UnicodeMetadata.find_targets(text, self.target)
-            return len(target_indices) > 0
-        except Exception:
-            return False
+            # 1. Prepare and serialize payload (similar to embed_metadata start)
+            inner_payload: Union[BasicPayload, ManifestPayload]
+            if self.metadata_format == "manifest":
+                # Reconstruct ManifestPayload (adjust based on actual keys needed)
+                 inner_payload = ManifestPayload(
+                    format=self.metadata_format,
+                    signer_id=self.signer_id,
+                    timestamp=self.metadata.get("timestamp", datetime.now(timezone.utc).isoformat()), # Ensure timestamp
+                    claim_generator=self.metadata.get("claim_generator"),
+                    actions=self.metadata.get("actions"),
+                    ai_info=self.metadata.get("ai_info"),
+                    custom_claims=self.metadata.get("custom_claims"),
+                )
+            else: # basic
+                inner_payload = BasicPayload(
+                    format="basic",
+                    signer_id=self.signer_id,
+                    timestamp=self.metadata.get("timestamp", datetime.now(timezone.utc).isoformat()), # Ensure timestamp
+                    model_id=self.metadata.get("model_id"),
+                    custom_metadata=self.metadata.get("custom_metadata"),
+                )
+
+            inner_payload_bytes = serialize_payload(inner_payload)
+            signature_bytes = sign_payload(self.private_key, inner_payload_bytes)
+            outer_payload = OuterPayload(
+                payload=inner_payload, signature=base64.urlsafe_b64encode(signature_bytes).decode("ascii")
+            )
+            outer_payload_bytes = serialize_payload(outer_payload)
+
+            # 2. Calculate required characters (bits)
+            binary_string = UnicodeMetadata._bytes_to_binary_string(outer_payload_bytes)
+            required_chars = len(binary_string)
+
+            # 3. Find available targets
+            available_targets = len(UnicodeMetadata.find_targets(text, self.target))
+
+            # 4. Compare
+            has_enough = available_targets >= required_chars
+            logger.info(
+                f"[_has_sufficient_targets CHECK] Text Length: {len(text)}, Target: {self.target.name}, "
+                f"Required Chars: {required_chars}, Available Targets: {available_targets}, Sufficient: {has_enough}"
+            )
+            return has_enough
+
+        except Exception as e:
+            logger.warning(f"Could not accurately determine sufficient targets: {e}. Assuming insufficient.", exc_info=True)
+            return False # Be conservative
 
     def process_chunk(self, chunk: Union[str, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
         """
@@ -181,13 +222,6 @@ class StreamingHandler:
         if self.encode_first_chunk_only and self.has_encoded:
             logger.debug("Metadata already encoded and encode_first_chunk_only=True. Returning chunk as is.")
             return chunk
-
-        # Limit embedding to encode_first_chunk_only=True for now
-        if not self.encode_first_chunk_only:
-            # Future: Could accumulate text and embed at the end, but requires different handling.
-            # For now, just return the chunk if not encoding the first one.
-            print("StreamingHandler currently only supports embedding metadata in the first chunk when using signatures.")
-            return chunk  # Or raise error? Returning unmodified seems safer for now.
 
         # If we're in accumulation mode or we need to check if this chunk has enough targets
         if self.is_accumulating or not self._has_sufficient_targets(chunk):
@@ -247,6 +281,8 @@ class StreamingHandler:
         except Exception as e:
             # Handle potential errors during embedding
             logger.error(f"Error embedding metadata in streaming chunk: {e}", exc_info=True)
+            logger.info(f"[_process_text_chunk EMBED FAIL] Returning original text. Length: {len(chunk)}") # DEBUG
+            self.is_accumulating = False # Avoid infinite loop if error persists
             return chunk
 
     def _process_dict_chunk(self, chunk: Dict[str, Any]) -> Dict[str, Any]:
