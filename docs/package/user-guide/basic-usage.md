@@ -60,9 +60,10 @@ text = "This is a sample text that will have metadata embedded within it."
 # Create metadata dictionary
 metadata = {
     "model_id": "gpt-4",
+    "timestamp": int(time.time()),  # Unix/Epoch timestamp (mandatory)
+    # "generationID": "openai-xyz123",  # Optional: Unique generation ID from API response
     "organization": "EncypherAI",
-    "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id  # Required for verification
 }
 
@@ -265,7 +266,7 @@ def create_metadata(model_id="gpt-4", organization="EncypherAI"):
         "model_id": model_id,
         "organization": organization,
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 
 # Use the function
@@ -296,7 +297,7 @@ for i, text in enumerate(texts):
         "organization": "EncypherAI",
         "timestamp": int(time.time()),  # Unix/Epoch timestamp
         "text_id": i + 1,
-        "version": "2.0.0",
+        "version": "2.1.0",
         "key_id": key_id  # Required for verification
     }
 
@@ -370,6 +371,30 @@ if result["has_metadata"]:
 else:
     print("No metadata found:", result["error"])
 ```
+
+## Understanding the Standard Metadata Fields
+
+EncypherAI enforces a standard set of metadata fields for all embeddings to ensure interoperability and clarity:
+
+- `signer_id` (**Mandatory**): Identifies the key pair used for signing. Must match the public key resolver.
+- `timestamp` (**Mandatory**): Time of content generation (ISO 8601 UTC or Unix epoch).
+- `model_id` (**Recommended**): Identifier for the AI model used (e.g., "gpt-4").
+- `generationID` (**Optional**): Unique identifier for the generation request/response (e.g., OpenAI or Anthropic response ID).
+- `custom_metadata` (**Optional**): Any additional metadata fields. These must not overwrite the standard fields above.
+
+**Example:**
+
+```python
+metadata = {
+    "signer_id": "my-key-id",  # Mandatory
+    "timestamp": 1714832824,    # Mandatory
+    "model_id": "gpt-4",      # Recommended
+    "generationID": "openai-xyz123",  # Optional
+    "custom_metadata": {"organization": "EncypherAI", "version": "2.1.0"}  # Optional
+}
+```
+
+> **Note:** Always provide the mandatory fields. Recommended and optional fields improve traceability and interoperability.
 
 ## Next Steps
 

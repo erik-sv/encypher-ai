@@ -11,12 +11,22 @@ from .logging_config import logger
 # --- TypedDict Definitions for Metadata Payloads ---
 
 
-class BasicPayload(TypedDict):
-    """Structure for the 'basic' metadata format payload."""
+class BasicPayload(TypedDict, total=False):
+    """
+    Structure for the 'basic' metadata format payload content.
+    This dictionary is typically passed to embed_metadata via individual
+    arguments (model_id, generationID) or the custom_metadata dict.
+    The embed_metadata function adds signer_id, timestamp, and format
+    before signing.
 
+    Standard Fields:
+        model_id (Optional[str]): Recommended. Identifier for the AI model.
+        generationID (Optional[str]): Optional. Unique identifier for the generation.
+        custom_metadata (Optional[Dict[str, Any]]): Optional. Dictionary for custom fields.
+    """
     model_id: Optional[str]
-    timestamp: Optional[str]  # Recommended: ISO 8601 UTC format string
-    custom_metadata: Dict[str, Any]
+    generationID: Optional[str]
+    custom_metadata: Optional[Dict[str, Any]]
 
 
 class ManifestAction(TypedDict):

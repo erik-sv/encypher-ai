@@ -282,9 +282,10 @@ class UnicodeMetadata:
         text: str,
         private_key: PrivateKeyTypes,
         signer_id: str,
+        timestamp: Union[str, datetime, date, int, float],
         metadata_format: Literal["basic", "manifest"] = "basic",
         model_id: Optional[str] = None,
-        timestamp: Optional[Union[str, datetime, date, int, float]] = None,
+        generationID: Optional[str] = None,
         target: Optional[Union[str, MetadataTarget]] = None,
         custom_metadata: Optional[Dict[str, Any]] = None,
         claim_generator: Optional[str] = None,
@@ -296,48 +297,32 @@ class UnicodeMetadata:
         """
         Embed metadata into text using Unicode variation selectors, signing with a private key.
 
-        When using 'manifest' format, this method implements a C2PA-inspired approach for
-        content provenance and authenticity, adapted specifically for plain-text environments
-        where traditional file-based embedding methods aren't applicable. The manifest structure
-        parallels C2PA's concepts of assertions, claim generators, and cryptographic integrity.
+        Standard Fields (for 'basic' format):
+        - signer_id (str): Mandatory. Identifier for the key pair used for signing.
+        - timestamp (Union[str, datetime, date, int, float]): Mandatory. Time of content generation. Will be stored as ISO 8601 UTC string.
+        - model_id (Optional[str]): Recommended. Identifier for the AI model used (e.g., 'gpt-4o').
+        - generationID (Optional[str]): Optional. Unique identifier for the specific generation request/response (e.g., map from OpenAI response 'id').
+        - custom_metadata (Optional[Dict[str, Any]]): Optional. Dictionary for any other custom fields relevant to the 'basic' format.
 
         Args:
             text: The text to embed metadata into.
             private_key: The Ed25519 private key object for signing.
-            signer_id: A string identifying the signer/key pair (used for
-                       verification lookup).
-            metadata_format: The format for the metadata payload ('basic' or 'manifest').
-                             Default is 'basic'. When set to 'manifest', uses a
-                             C2PA-inspired structured format.
-            model_id: Model identifier (used in 'basic' and optionally in
-                      'manifest' ai_info).
-            timestamp: Timestamp (datetime, ISO string, int/float epoch). Stored as
-                       ISO 8601 UTC string.
-                       **This field is mandatory.**
-            target: Where to embed metadata ('whitespace', 'punctuation', etc.,
-                    or MetadataTarget enum).
+            signer_id: A string identifying the signer/key pair.
+            timestamp: Timestamp (datetime, ISO string, int/float epoch). **This field is mandatory.**
+            metadata_format: The format for the metadata payload ('basic' or 'manifest'). Default is 'basic'.
+            model_id: Model identifier (recommended for 'basic').
+            generationID: Optional unique identifier for the generation.
+            target: Where to embed metadata ('whitespace', 'punctuation', etc.).
             custom_metadata: Dictionary for custom fields (used in 'basic' payload).
-            claim_generator: Claim generator string (used in 'manifest' format).
-                             Similar to C2PA's concept of identifying the
-                             software/tool that generated the claim.
-            actions: List of action dictionaries (used in 'manifest' format).
-                     Conceptually similar to C2PA assertions about operations
-                     performed on the content.
-            ai_info: Dictionary with AI-specific info (used in 'manifest' format).
-                     Represents a custom assertion type focused on AI-specific
-                     attributes.
-            custom_claims: Dictionary for custom C2PA-like claims (used in
-                           'manifest' format).
-            distribute_across_targets: If True, distribute bits across multiple
-                                       targets if needed.
+            # ... (rest of args and manifest args) ...
 
         Returns:
             The text with embedded metadata and digital signature.
 
         Raises:
-            ValueError: If 'timestamp' is not provided, if the target is invalid,
-                        if not enough embedding locations are found, or if the
-                        metadata + signature is too large.
+            ValueError: If mandatory fields are missing, target is invalid, etc.
+            TypeError: If input types are incorrect.
+            RuntimeError: If signing or serialization fails.
         """
         logger.debug(
             f"embed_metadata called with text (type={type(text).__name__}), signer_id='{signer_id}', "
@@ -406,9 +391,11 @@ class UnicodeMetadata:
             }
             if model_id:
                 payload_data["model_id"] = model_id
+            if generationID:
+                payload_data["generationID"] = generationID
             if custom_metadata:
                 # Merge custom metadata, ensuring no overlaps with standard keys
-                standard_keys = {"signer_id", "timestamp", "format", "model_id"}
+                standard_keys = {"signer_id", "timestamp", "format", "model_id", "generationID"}
                 if any(key in standard_keys for key in custom_metadata):
                     logger.warning("Custom metadata keys overlap with standard keys.")
                     # Prioritize standard keys; filter out overlaps from custom

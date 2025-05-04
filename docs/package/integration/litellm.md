@@ -58,17 +58,33 @@ text = response.choices[0].message.content
 
 # Create metadata
 metadata = {
-    "model": response.model,
-    "provider": "openai",  # Determined based on the model
-    "timestamp": time.time(),
-    "key_id": "litellm-key-1", # Identifier for the key
+    # Standard EncypherAI fields:
+    "model_id": response.model,  # Recommended: AI model identifier
+    "timestamp": int(time.time()),  # Mandatory: use epoch time
+    # "generationID": response.id,  # Optional: LiteLLM response ID if available
+    "signer_id": "litellm-key-1",  # Mandatory: key pair identifier
+    # Additional LiteLLM fields (optional)
+    "provider": "openai",  # Example provider
     "prompt_tokens": response.usage.prompt_tokens,
     "completion_tokens": response.usage.completion_tokens,
     "total_tokens": response.usage.total_tokens
 }
 
 # Embed metadata
-encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    private_key=private_key,
+    signer_id="litellm-key-1",
+    timestamp=int(time.time()),
+    model_id=response.model,
+    # generationID=response.id,  # If available
+    custom_metadata={
+        "provider": "openai",
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "total_tokens": response.usage.total_tokens
+    }
+)
 
 print("Original response:")
 print(text)
@@ -105,19 +121,20 @@ import os
 os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
 os.environ["ANTHROPIC_API_KEY"] = "your-anthropic-api-key"
 
-# Generate key pair and resolver (replace with your actual key management)
+# Generate key pair and resolver for proxy interaction
 private_key, public_key = generate_key_pair()
-def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
+def resolve_public_key_proxy(key_id: str) -> Optional[PublicKeyTypes]:
     if key_id == "litellm-stream-key":
         return public_key
     return None
 
 # Create metadata
 metadata = {
-    "model": "gpt-4",
-    "provider": "openai",
-    "timestamp": time.time(),
-    "key_id": "litellm-stream-key"
+    "model_id": "gpt-4",  # Recommended: AI model identifier
+    "timestamp": int(time.time()),  # Mandatory: use epoch time
+    "signer_id": "litellm-stream-key",  # Mandatory: key pair identifier
+    # Additional LiteLLM fields (optional)
+    "provider": "openai",  # Example provider
 }
 
 # Initialize the streaming handler
@@ -161,7 +178,7 @@ print("\n\nStreaming completed!")
 # Extract and verify the metadata
 is_valid, verified_metadata = UnicodeMetadata.verify_metadata(
     full_response,
-    public_key_resolver=resolve_public_key
+    public_key_resolver=resolve_public_key_proxy
 )
 
 print("\nExtracted metadata:")
@@ -230,10 +247,11 @@ def generate_with_metadata(model, prompt, system_prompt=None):
 
     # Create metadata
     metadata = {
-        "model": response.model,
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": int(time.time()),  # Mandatory: use epoch time
+        "signer_id": key_id,  # Mandatory: key pair identifier
+        # Additional LiteLLM fields (optional)
         "provider": provider,
-        "timestamp": time.time(),
-        "key_id": key_id
     }
 
     # Add usage info if available
@@ -245,7 +263,19 @@ def generate_with_metadata(model, prompt, system_prompt=None):
         })
 
     # Embed metadata
-    encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text=text,
+        private_key=private_key,
+        signer_id=key_id,
+        timestamp=int(time.time()),
+        model_id=response.model,
+        custom_metadata={
+            "provider": provider,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens
+        }
+    )
 
     return encoded_text, metadata
 
@@ -276,7 +306,7 @@ for i, (encoded, original_meta) in enumerate([openai_response, anthropic_respons
         encoded,
         public_key_resolver=resolve_public_key
     )
-    print(f"\nResponse {i+1} (Model: {original_meta['model']}):")
+    print(f"\nResponse {i+1} (Model: {original_meta['model_id']}):")
     print(f"  Verified Metadata: {json.dumps(verified_metadata, indent=2)}")
     print(f"  Verification result: {'✅ Verified' if is_valid else '❌ Failed'}")
 ```
@@ -382,10 +412,11 @@ else:
 
 # Create metadata
 metadata = {
-    "model": response.model,
+    "model_id": response.model,  # Recommended: AI model identifier
+    "timestamp": int(time.time()),  # Mandatory: use epoch time
+    "signer_id": "litellm-proxy-key",  # Mandatory: key pair identifier
+    # Additional LiteLLM fields (optional)
     "provider": "openai", # Provider info might come from proxy response
-    "timestamp": time.time(),
-    "key_id": "litellm-proxy-key",
     "function_call": message.function_call.name if hasattr(message, "function_call") and message.function_call else None
 }
 
@@ -398,7 +429,19 @@ if hasattr(response, "usage"):
     })
 
 # Embed metadata
-encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    private_key=private_key,
+    signer_id="litellm-proxy-key",
+    timestamp=int(time.time()),
+    model_id=response.model,
+    custom_metadata={
+        "provider": "openai",
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "total_tokens": response.usage.total_tokens
+    }
+)
 
 print("Response via LiteLLM Proxy with embedded metadata:")
 print(encoded_text)
@@ -460,10 +503,11 @@ async def add_metadata_middleware(request, call_next):
 
                 # Create metadata
                 metadata = {
-                    "model": data.get("model", "unknown"),
-                    "organization": "YourOrganization",
-                    "timestamp": time.time(),
-                    "key_id": "litellm-proxy-key"
+                    "model_id": data.get("model", "unknown"),  # Recommended: AI model identifier
+                    "timestamp": int(time.time()),  # Mandatory: use epoch time
+                    "signer_id": "litellm-proxy-key",  # Mandatory: key pair identifier
+                    # Additional LiteLLM fields (optional)
+                    "provider": "openai", # Provider info might come from proxy response
                 }
 
                 # Add usage information if available
@@ -475,7 +519,19 @@ async def add_metadata_middleware(request, call_next):
                     })
 
                 # Embed metadata
-                encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+                encoded_text = UnicodeMetadata.embed_metadata(
+                    text=text,
+                    private_key=private_key,
+                    signer_id="litellm-proxy-key",
+                    timestamp=int(time.time()),
+                    model_id=data.get("model", "unknown"),
+                    custom_metadata={
+                        "provider": "openai",
+                        "prompt_tokens": data["usage"].get("prompt_tokens", 0),
+                        "completion_tokens": data["usage"].get("completion_tokens", 0),
+                        "total_tokens": data["usage"].get("total_tokens", 0)
+                    }
+                )
 
                 # Update the response
                 data["choices"][0]["message"]["content"] = encoded_text
@@ -556,10 +612,11 @@ def resolve_public_key_proxy_stream(key_id: str) -> Optional[PublicKeyTypes]:
 
 # Create metadata
 metadata = {
-    "model": "gpt-4", # The model requested via proxy
-    "provider": "openai", # Or determined by proxy
-    "timestamp": time.time(),
-    "key_id": "litellm-proxy-stream-key"
+    "model_id": "gpt-4",  # Recommended: AI model identifier
+    "timestamp": int(time.time()),  # Mandatory: use epoch time
+    "signer_id": "litellm-proxy-stream-key",  # Mandatory: key pair identifier
+    # Additional LiteLLM fields (optional)
+    "provider": "openai", # Provider info might come from proxy response
 }
 
 # Initialize the streaming handler

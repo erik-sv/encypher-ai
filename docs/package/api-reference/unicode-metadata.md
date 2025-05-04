@@ -150,28 +150,85 @@ def extract_bytes(cls, text: str) -> bytes:
 def embed_metadata(
     cls,
     text: str,
-    metadata: Dict[str, Any],
     private_key: PrivateKeyTypes,
-    target: str = "whitespace"
+    signer_id: str,  # Mandatory: Identifier for the key pair
+    timestamp: Union[str, datetime, date, int, float],  # Mandatory: Time of generation
+    metadata_format: Literal["basic", "manifest"] = "basic",
+    model_id: Optional[str] = None,  # Recommended for 'basic' format
+    generationID: Optional[str] = None,  # Optional standard field
+    target: Optional[Union[str, MetadataTarget]] = None,
+    custom_metadata: Optional[Dict[str, Any]] = None,  # For 'basic' format custom fields
+    claim_generator: Optional[str] = None,
+    actions: Optional[List[Dict[str, Any]]] = None,
+    ai_info: Optional[Dict[str, Any]] = None,
+    custom_claims: Optional[Dict[str, Any]] = None,
+    distribute_across_targets: bool = False,
 ) -> str:
     """
-    Embed metadata into text using Unicode variation selectors.
+    Embed metadata into text using Unicode variation selectors, signing with a private key.
+
+    Standard Fields (for 'basic' format):
+    - signer_id (str): **Mandatory.** Identifier for the key pair used for signing.
+    - timestamp (Union[str, datetime, date, int, float]): **Mandatory.** Time of content generation. Will be stored as ISO 8601 UTC string.
+    - model_id (Optional[str]): **Recommended.** Identifier for the AI model used (e.g., 'gpt-4o').
+    - generationID (Optional[str]): **Optional.** Unique identifier for the specific generation request/response (e.g., map from OpenAI response 'id').
+    - custom_metadata (Optional[Dict[str, Any]]): **Optional.** Dictionary for any other custom fields relevant to the 'basic' format.
 
     Args:
-        text: The text to embed metadata into
-        metadata: Dictionary containing metadata to embed. Must include a 'key_id' field
-                 that identifies the private key used for signing and a 'timestamp' field.
-        private_key: Ed25519 private key used to sign the metadata
-        target: Where to embed metadata. Can be "whitespace", "punctuation",
-               "first_letter", "last_letter", or "all_characters"
+        text: The text to embed metadata into.
+        private_key: The Ed25519 private key object for signing.
+        signer_id: A string identifying the signer/key pair.
+        timestamp: Timestamp (datetime, ISO string, int/float epoch). **This field is mandatory.**
+        metadata_format: The format for the metadata payload ('basic' or 'manifest'). Default is 'basic'.
+        model_id: Model identifier (recommended for 'basic').
+        generationID: Optional unique identifier for the generation.
+        target: Where to embed metadata ('whitespace', 'punctuation', etc.).
+        custom_metadata: Dictionary for custom fields (used in 'basic' payload).
+        # ... (rest of args and manifest args) ...
 
     Returns:
-        Text with embedded metadata and digital signature
+        The text with embedded metadata and digital signature.
 
     Raises:
-        ValueError: If there are not enough targets to embed all data, if metadata
-                   doesn't contain a 'key_id' field, or if metadata doesn't contain a 'timestamp' field
+        ValueError: If mandatory fields are missing, target is invalid, etc.
+        TypeError: If input types are incorrect.
+        RuntimeError: If signing or serialization fails.
     """
+    # Parameters
+    - `text` (str): The text to embed metadata into.
+    - `private_key` (PrivateKeyTypes): Ed25519 private key for signing.
+    - `signer_id` (str): **Mandatory.** Identifier for the key pair used for signing (should match public key resolver).
+    - `timestamp` (Union[str, datetime, date, int, float]): **Mandatory.** Timestamp of content generation (ISO 8601 UTC recommended).
+    - `metadata_format` (Literal["basic", "manifest"]): Format of metadata payload. Default is "basic".
+    - `model_id` (Optional[str]): **Recommended.** Identifier for the AI model used.
+    - `generationID` (Optional[str]): **Optional.** Unique identifier for the generation request/response (e.g., API response ID).
+    - `target` (Optional[Union[str, MetadataTarget]]): Where to embed metadata. Default is None (auto).
+    - `custom_metadata` (Optional[Dict[str, Any]]): **Optional.** Additional custom metadata fields (should not overwrite standard fields).
+
+    # Standard Metadata Fields
+    - `signer_id`: **Mandatory**
+    - `timestamp`: **Mandatory**
+    - `model_id`: **Recommended**
+    - `generationID`: **Optional**
+    - `custom_metadata`: **Optional**
+
+    # Returns
+    - `str`: The text with embedded, signed metadata.
+
+    # Example
+    ```python
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text="Sample text.",
+        private_key=private_key,
+        signer_id="my-key-id",
+        timestamp=1714832824,
+        model_id="gpt-4",
+        generationID="openai-xyz123",
+        custom_metadata={"project": "EncypherAI"}
+    )
+    ```
+
+    > **Note:** Standard fields are enforced for interoperability. Custom metadata should not overwrite these fields.
 ```
 
 ### extract_metadata
@@ -319,7 +376,7 @@ def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id  # Required for verification
 }
 

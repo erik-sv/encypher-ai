@@ -182,7 +182,7 @@ original_text = "Content authenticity is crucial in the age of AI-generated medi
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id  # Required for verification
 }
 

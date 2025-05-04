@@ -33,10 +33,12 @@ def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
 
 ```python
 # Define your metadata (must include key_id)
+# -- Update example to use model_id, timestamp, and note generationID --
 metadata = {
     "model_id": "gpt-4",
-    "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "2.0.0",
+    "timestamp": int(time.time()),  # Unix/Epoch timestamp (mandatory)
+    # "generationID": "openai-xyz123",  # Optional: Unique generation ID from API response
+    "version": "2.1.0",
     "organization": "EncypherAI",
     "key_id": key_id  # Required for verification
 }
@@ -54,6 +56,13 @@ encoded_text = UnicodeMetadata.embed_metadata(
 
 # The encoded_text looks identical to the original text when displayed,
 # but contains invisible zero-width characters that encode the metadata
+
+# **Standard Metadata Fields:** For consistency and interoperability, especially with the `basic` format, we recommend including these standard fields:
+# * `signer_id` (Mandatory): Identifies the key pair used.
+# * `timestamp` (Mandatory): Records when the content was generated (ISO 8601 UTC format recommended).
+# * `model_id` (Recommended): Specifies the AI model used.
+# * `generationID` (Optional): A unique ID for the generation request (useful for tracing).
+# * `custom_metadata` (Optional): A dictionary for any other relevant information.
 ```
 
 ### 4. Extract and Verify Metadata

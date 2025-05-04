@@ -56,15 +56,17 @@ generated_text = response.text
 # Embed metadata into the generated text
 encoded_text = UnicodeMetadata.embed_metadata(
     text=generated_text,
-    model_id="gemini-1.5-flash",
-    timestamp=int(time.time()),
-    key_id="gemini-key-1", # Identifier for the key
+    private_key=private_key,
+    signer_id="gemini-key-1",  # Mandatory
+    timestamp=int(time.time()),  # Mandatory
+    model_id="gemini-1.5-flash",  # Recommended
+    # generationID: Gemini API may provide a request/response ID if available
     custom_metadata={
         "prompt": prompt,
-        "version": "2.0.0"
-    },
-    private_key=private_key
+        "version": "2.1.0"
+    }
 )
+# Note: Standard fields: signer_id (mandatory), timestamp (mandatory), model_id (recommended), generationID (optional), custom_metadata (optional)
 
 # Later, verify and extract the metadata
 is_valid, metadata = UnicodeMetadata.verify_metadata(
@@ -96,15 +98,16 @@ chat = model.start_chat(history=[])
 def process_gemini_response(response_text, prompt):
     return UnicodeMetadata.embed_metadata(
         text=response_text,
-        key_id="gemini-key-1",
-        model_id="gemini-1.5-flash",
-        timestamp=int(time.time()),
+        private_key=private_key,
+        signer_id="gemini-key-1",  # Mandatory
+        timestamp=int(time.time()),  # Mandatory
+        model_id="gemini-1.5-flash",  # Recommended
+        # generationID: Gemini API may provide a request/response ID if available
         custom_metadata={
             "prompt": prompt,
             "chat_id": chat.session_id,
-            "version": "2.0.0"
-        },
-        private_key=private_key
+            "version": "2.1.0"
+        }
     )
 
 # Send messages and encode responses
@@ -227,23 +230,24 @@ if hasattr(response.candidates[0].content.parts[0], 'function_call'):
 
         # Embed metadata in the final response
         metadata_to_embed = {
-            "model_id": "gemini-1.5-flash",
-            "timestamp": int(time.time()),
-            "key_id": "gemini-key-1",
+            "private_key": private_key,
+            "signer_id": "gemini-key-1",  # Mandatory
+            "timestamp": int(time.time()),  # Mandatory
+            "model_id": "gemini-1.5-flash",  # Recommended
+            # generationID: Gemini API may provide a request/response ID if available
             "custom_metadata": {
                 "prompt": user_query,
                 "function_called": function_name,
                 "function_args": function_args,
                 "function_result": weather_data,
-                "version": "2.0.0"
+                "version": "2.1.0"
             }
         }
 
         # Embed metadata into the final text response
         encoded_response_text = UnicodeMetadata.embed_metadata(
             text=final_text,
-            **metadata_to_embed,
-            private_key=private_key
+            **metadata_to_embed
         )
         print(f"\nFinal response with embedded metadata:\n{encoded_response_text}")
 
@@ -258,14 +262,15 @@ if hasattr(response.candidates[0].content.parts[0], 'function_call'):
         # Handle regular text response
         encoded_response_text = UnicodeMetadata.embed_metadata(
             text=response.text,
-            key_id="gemini-key-1",
-            model_id="gemini-1.5-flash",
-            timestamp=int(time.time()),
+            private_key=private_key,
+            signer_id="gemini-key-1",  # Mandatory
+            timestamp=int(time.time()),  # Mandatory
+            model_id="gemini-1.5-flash",  # Recommended
+            # generationID: Gemini API may provide a request/response ID if available
             custom_metadata={
                 "prompt": user_query,
-                "version": "2.0.0"
-            },
-            private_key=private_key
+                "version": "2.1.0"
+            }
         )
         print(f"\nRegular response with embedded metadata:\n{encoded_response_text}")
 
@@ -305,15 +310,16 @@ image_description = response.text
 # Embed metadata into the response
 encoded_text = UnicodeMetadata.embed_metadata(
     text=image_description,
-    key_id="gemini-key-1",
-    model_id="gemini-1.5-flash",
-    timestamp=int(time.time()),
+    private_key=private_key,
+    signer_id="gemini-key-1",  # Mandatory
+    timestamp=int(time.time()),  # Mandatory
+    model_id="gemini-1.5-flash",  # Recommended
+    # generationID: Gemini API may provide a request/response ID if available
     custom_metadata={
         "content_type": "image_description",
         "image_filename": "example_image.jpg",
-        "version": "2.0.0"
-    },
-    private_key=private_key
+        "version": "2.1.0"
+    }
 )
 
 print("Encoded image description:")
@@ -343,19 +349,20 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Create metadata
 metadata = {
-    "model_id": "gemini-1.5-flash",
-    "timestamp": int(time.time()),
-    "key_id": "gemini-key-1",
+    "private_key": private_key,
+    "signer_id": "gemini-key-1",  # Mandatory
+    "timestamp": int(time.time()),  # Mandatory
+    "model_id": "gemini-1.5-flash",  # Recommended
+    # generationID: Gemini API may provide a request/response ID if available
     "custom_metadata": {
         "stream_type": "gemini",
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 }
 
 # Initialize the streaming handler
 handler = StreamingHandler(
-    metadata=metadata,
-    private_key=private_key # Use the private key
+    metadata=metadata
 )
 
 # Start the streaming generation
@@ -382,7 +389,7 @@ print("\n\nStreaming completed!")
 
 # Verify the complete response
 is_valid, metadata = UnicodeMetadata.verify_metadata(
-    text=full_response, # Verify the assembled text
+    text=full_response,  # Verify the assembled text
     public_key_resolver=resolve_public_key
 )
 
@@ -423,15 +430,16 @@ safe_text = response.text
 # Embed metadata including safety information
 encoded_text = UnicodeMetadata.embed_metadata(
     text=safe_text,
-    key_id="gemini-key-1",
-    model_id="gemini-1.5-flash",
-    timestamp=int(time.time()),
+    private_key=private_key,
+    signer_id="gemini-key-1",  # Mandatory
+    timestamp=int(time.time()),  # Mandatory
+    model_id="gemini-1.5-flash",  # Recommended
+    # generationID: Gemini API may provide a request/response ID if available
     custom_metadata={
         "prompt": prompt,
         "safety_settings": "medium_and_above_blocked",
-        "version": "2.0.0"
-    },
-    private_key=private_key
+        "version": "2.1.0"
+    }
 )
 
 print("Encoded text with safety settings:")
@@ -465,18 +473,19 @@ generated_text = response.text
 # Embed metadata including generation parameters
 encoded_text = UnicodeMetadata.embed_metadata(
     text=generated_text,
-    key_id="gemini-key-1",
-    model_id="gemini-1.5-flash",
-    timestamp=int(time.time()),
+    private_key=private_key,
+    signer_id="gemini-key-1",  # Mandatory
+    timestamp=int(time.time()),  # Mandatory
+    model_id="gemini-1.5-flash",  # Recommended
+    # generationID: Gemini API may provide a request/response ID if available
     custom_metadata={
         "prompt": prompt,
         "temperature": 0.2,
         "top_p": 0.8,
         "top_k": 40,
         "max_tokens": 1024,
-        "version": "2.0.0"
-    },
-    private_key=private_key
+        "version": "2.1.0"
+    }
 )
 
 print("Encoded text with generation parameters:")
@@ -519,7 +528,7 @@ def process_gemini_response(response_text, prompt, metadata=None):
     custom_metadata = {
         "prompt": prompt,
         "chat_id": chat.session_id,
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 
     # Add any additional metadata
@@ -528,11 +537,12 @@ def process_gemini_response(response_text, prompt, metadata=None):
 
     return UnicodeMetadata.embed_metadata(
         text=response_text,
-        key_id="gemini-key-1", # Identifier for the key
-        model_id="gemini-1.5-flash",
-        timestamp=int(time.time()),
-        custom_metadata=custom_metadata,
-        private_key=private_key
+        private_key=private_key,
+        signer_id="gemini-key-1",  # Mandatory
+        timestamp=int(time.time()),  # Mandatory
+        model_id="gemini-1.5-flash",  # Recommended
+        # generationID: Gemini API may provide a request/response ID if available
+        custom_metadata=custom_metadata
     )
 
 # Start conversation

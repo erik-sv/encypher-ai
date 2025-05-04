@@ -56,17 +56,33 @@ text = response.choices[0].message.content
 
 # Create metadata
 metadata = {
-    "model": response.model,
+    # Standard EncypherAI fields:
+    "model_id": response.model,  # Recommended: AI model identifier
+    "timestamp": response.created,  # Mandatory: OpenAI epoch timestamp
+    "generationID": response.id,  # Optional: OpenAI response ID
+    "signer_id": "openai-nonstream-key",  # Mandatory: key pair identifier
+    # Additional OpenAI fields (optional)
     "organization": "YourOrganization",
-    "timestamp": time.time(),
     "prompt_tokens": response.usage.prompt_tokens,
     "completion_tokens": response.usage.completion_tokens,
-    "total_tokens": response.usage.total_tokens,
-    "key_id": "openai-nonstream-key" # Identifier for the key
+    "total_tokens": response.usage.total_tokens
 }
 
 # Embed metadata using UnicodeMetadata
-encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    private_key=private_key,
+    signer_id="openai-nonstream-key",
+    timestamp=response.created,
+    model_id=response.model,
+    generationID=response.id,
+    custom_metadata={
+        "organization": "YourOrganization",
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "total_tokens": response.usage.total_tokens
+    }
+)
 
 print("Original response:")
 print(text)
@@ -115,10 +131,11 @@ def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
 
 # Create metadata
 metadata = {
-    "model": "gpt-4",
-    "organization": "YourOrganization",
-    "timestamp": time.time(),
-    "key_id": "openai-stream-key"
+    "model_id": "gpt-4",  # Recommended: AI model identifier
+    "timestamp": time.time(),  # Mandatory: OpenAI epoch timestamp
+    "signer_id": "openai-stream-key",  # Mandatory: key pair identifier
+    # Additional OpenAI fields (optional)
+    "organization": "YourOrganization"
 }
 
 # Initialize the streaming handler
@@ -278,14 +295,26 @@ if message.tool_calls:
 
     # Create metadata
     metadata = {
-        "model": response.model,
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: OpenAI epoch timestamp
+        "generationID": response.id,  # Optional: OpenAI response ID
+        "signer_id": "openai-func-key",  # Mandatory: key pair identifier
         "initial_function_call": function_name,
-        "timestamp": time.time(),
-        "key_id": "openai-func-key"
+        "key_id": "openai-func-key" # Identifier for the key
     }
 
     # Embed metadata
-    encoded_text = UnicodeMetadata.embed_metadata(final_text, metadata, private_key)
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text=final_text,
+        private_key=private_key,
+        signer_id="openai-func-key",
+        timestamp=response.created,
+        model_id=response.model,
+        generationID=response.id,
+        custom_metadata={
+            "initial_function_call": function_name
+        }
+    )
 
     print("\nFinal response with embedded metadata:")
     print(encoded_text)
@@ -303,11 +332,20 @@ else:
     # No function call, process as a regular response
     text = message.content
     metadata = {
-        "model": response.model,
-        "timestamp": time.time(),
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: OpenAI epoch timestamp
+        "generationID": response.id,  # Optional: OpenAI response ID
+        "signer_id": "openai-func-key",  # Mandatory: key pair identifier
         "key_id": "openai-func-key" # Use the same key_id for consistency
     }
-    encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text=text,
+        private_key=private_key,
+        signer_id="openai-func-key",
+        timestamp=response.created,
+        model_id=response.model,
+        generationID=response.id
+    )
     print("Response with embedded metadata:")
     print(encoded_text)
     # Verification would be the same as above
@@ -321,9 +359,9 @@ You can create a helper function to extract metadata from OpenAI responses:
 def extract_openai_metadata(response):
     """Extract metadata from an OpenAI API response."""
     metadata = {
-        "model": response.model,
-        "organization": "YourOrganization",
-        "timestamp": time.time(),
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: OpenAI epoch timestamp
+        "generationID": response.id,  # Optional: OpenAI response ID
     }
 
     # Add usage information if available
@@ -395,17 +433,24 @@ def generate():
 
     # Create metadata
     metadata = {
-        "model": response.model,
-        "organization": "YourOrganization",
-        "timestamp": time.time(),
-        "prompt_tokens": response.usage.prompt_tokens,
-        "completion_tokens": response.usage.completion_tokens,
-        "total_tokens": response.usage.total_tokens,
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: OpenAI epoch timestamp
+        "generationID": response.id,  # Optional: OpenAI response ID
+        "signer_id": "fastapi-openai-key",  # Mandatory: key pair identifier
         "user_id": data.get('user_id', 'anonymous')
     }
 
     # Embed metadata
-    encoded_text = encoder.embed_metadata(text, metadata)
+    encoded_text = encoder.embed_metadata(
+        text=text,
+        signer_id="fastapi-openai-key",
+        timestamp=response.created,
+        model_id=response.model,
+        generationID=response.id,
+        custom_metadata={
+            "user_id": data.get('user_id', 'anonymous')
+        }
+    )
 
     # Return the response
     return jsonify({
@@ -461,10 +506,10 @@ def generate_stream(request: Request):
 
     # Create metadata
     metadata = {
-        "model": "gpt-4",
-        "timestamp": time.time(),
-        "user_id": data.get('user_id', 'anonymous'), # Example extra field
-        "key_id": "fastapi-openai-key"
+        "model_id": "gpt-4",  # Recommended: AI model identifier
+        "timestamp": time.time(),  # Mandatory: OpenAI epoch timestamp
+        "signer_id": "fastapi-openai-key",  # Mandatory: key pair identifier
+        "user_id": data.get('user_id', 'anonymous') # Example extra field
     }
 
     # Initialize the streaming handler

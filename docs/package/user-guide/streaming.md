@@ -46,7 +46,7 @@ metadata = {
     "model_id": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "user-key-1" # Include an identifier for the key
 }
 
@@ -130,7 +130,7 @@ metadata = {
     "model_id": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "openai-key-1"
 }
 
@@ -200,7 +200,7 @@ metadata = {
     "model_id": "claude-3-opus-20240229",
     "organization": "EncypherAI",
     "timestamp": int(time.time()),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "anthropic-key-1"
 }
 
@@ -264,7 +264,7 @@ metadata = {
     "model_id": "gpt-4",
     "provider": "openai",
     "timestamp": int(time.time()),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "litellm-key-1"
 }
 
@@ -324,7 +324,7 @@ import time
 metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "user-key-1" # Include an identifier for the key
 }
 
@@ -406,7 +406,7 @@ async def generate_stream(request: Request):
     metadata = {
         "prompt_hash": hash(prompt), # Example detail
         "timestamp": int(time.time()),
-        "version": "2.0.0",
+        "version": "2.1.0",
         "key_id": "fastapi-key-1"
     }
 
@@ -485,7 +485,7 @@ def generate_stream():
     metadata = {
         "prompt_hash": hash(prompt), # Example detail
         "timestamp": int(time.time()),
-        "version": "2.0.0",
+        "version": "2.1.0",
         "key_id": "flask-key-1"
     }
 

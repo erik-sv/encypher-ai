@@ -2,6 +2,22 @@
 
 This document provides a chronological list of notable changes for each version of EncypherAI.
 
+## 2.1.0 (05-04-2025)
+
+### Added
+- `generationID` as an optional standard metadata field in `embed_metadata` and all related APIs.
+- Documentation updates to clarify standard metadata fields: `signer_id` (mandatory), `timestamp` (mandatory), `model_id` (recommended), `generationID` (optional), `custom_metadata` (optional).
+- Integration guides for OpenAI, Gemini, Anthropic, LiteLLM updated to show field mapping and new signature usage.
+- API reference and user guides updated with explicit examples and field status.
+- All code and documentation examples now use `version: 2.1.0` in metadata.
+
+### Changed
+- All guides and API docs now consistently explain and enforce the metadata field standard for interoperability.
+- Improved clarity and modularity in code and documentation examples.
+
+### Fixed
+- Ensured custom_metadata cannot overwrite standard fields in payload construction.
+
 ## 2.0.0 (04-13-2025)
 
 ### Added

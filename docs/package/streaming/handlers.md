@@ -130,7 +130,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "MyCompany",
     "timestamp": time.time(),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "example-key-1" # Identifier for the public key
 }
 
@@ -209,7 +209,7 @@ metadata = {
     "model": "gpt-4",
     "organization": "MyCompany",
     "timestamp": time.time(),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "openai-stream-key"
 }
 
@@ -291,7 +291,7 @@ metadata = {
     "model": "claude-3-opus-20240229",
     "organization": "MyCompany",
     "timestamp": time.time(),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "anthropic-stream-key"
 }
 
@@ -370,7 +370,7 @@ metadata = {
     "model": "gpt-4",
     "provider": "openai",
     "timestamp": time.time(),
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": "litellm-stream-key"
 }
 

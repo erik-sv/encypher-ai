@@ -92,7 +92,7 @@ public_pem = public_key.public_bytes(
 app = FastAPI(
     title="EncypherAI Demo",
     description="API for embedding and extracting metadata in text using Digital Signatures",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # Add CORS middleware
@@ -178,7 +178,7 @@ with open("templates/index.html", "w") as f:
     "model": "gpt-4",
     "organization": "EncypherAI",
     "timestamp": 1742713200,
-    "version": "2.0.0"
+    "version": "2.1.0"
 }</textarea>
                         </div>
                         <div class="mb-3">
@@ -408,7 +408,7 @@ async def generate_with_openai(
             "organization": "EncypherAI",
             "timestamp": int(time.time()),
             "prompt": prompt,
-            "version": "2.0.0"
+            "version": "2.1.0"
         }
 
         # Handle streaming
@@ -549,7 +549,7 @@ data = {
         "model": "gpt-4",
         "organization": "EncypherAI",
         "timestamp": int(time.time()),
-        "version": "2.0.0"
+        "version": "2.1.0"
     },
     "target": "whitespace"
 }

@@ -54,12 +54,36 @@ def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
 
 # Create metadata dictionary
 metadata = {
-    "model_id": "gpt-4",
-    "organization": "EncypherAI",
-    "timestamp": int(time.time()),  # Unix/Epoch timestamp
-    "version": "2.0.0",
-    "key_id": key_id  # Required for verification
+    "signer_id": "example-key-1",  # Mandatory
+    "timestamp": int(time.time()),        # Mandatory
+    "model_id": "gpt-4",          # Recommended
+    "generationID": "openai-xyz123",  # Optional
+    "custom_metadata": {"organization": "EncypherAI", "version": "2.1.0"}  # Optional
 }
+
+### Recommended 'basic' Payload Structure
+
+For the `basic` format, the following fields are recommended:
+
+- `signer_id` (**Mandatory**): Identifies the key pair used for signing. Must match the public key resolver.
+- `timestamp` (**Mandatory**): Time of content generation (ISO 8601 UTC or Unix epoch).
+- `model_id` (**Recommended**): Identifier for the AI model used (e.g., "gpt-4").
+- `generationID` (**Optional**): Unique identifier for the generation request/response (e.g., OpenAI response 'id').
+- `custom_metadata` (**Optional**): Any additional metadata fields (must not overwrite the above fields).
+
+**Example:**
+
+```python
+metadata = {
+    "signer_id": "example-key-1",  # Mandatory
+    "timestamp": 1714832824,        # Mandatory
+    "model_id": "gpt-4",          # Recommended
+    "generationID": "openai-xyz123",  # Optional
+    "custom_metadata": {"organization": "EncypherAI", "version": "2.1.0"}  # Optional
+}
+```
+
+> **Tip:** Always provide the mandatory fields. Recommended and optional fields enhance traceability and downstream compatibility.
 
 # Embed metadata
 encoded_text = UnicodeMetadata.embed_metadata(
@@ -148,7 +172,7 @@ metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),
     "organization": "EncypherAI",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id  # Required for verification
 }
 
@@ -274,7 +298,7 @@ metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),
     "organization": "EncypherAI",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id
 }
 
@@ -332,7 +356,7 @@ metadata = {
     "model_id": "gpt-4",
     "timestamp": int(time.time()),
     "organization": "EncypherAI",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "key_id": key_id
 }
 

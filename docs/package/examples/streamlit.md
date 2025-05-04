@@ -139,7 +139,7 @@ def basic_embedding():
                 "Timestamp:",
                 value=str(int(time.time()))
             )
-            version = st.text_input("Version:", value="2.0.0")
+            version = st.text_input("Version:", value="2.1.0")
 
         # Additional custom fields
         custom_fields = {}
@@ -302,7 +302,7 @@ with tabs[0]:
         model_id = st.text_input("Model ID:", value="gpt-4-demo")
         org = st.text_input("Organization:", value="StreamlitApp")
         timestamp = st.number_input("Timestamp:", value=int(time.time()))
-        version = st.text_input("Version:", value="2.0.0")
+        version = st.text_input("Version:", value="2.1.0")
 
     with col2:
         key_id_input = st.text_input("Key ID:", value=st.session_state.key_id)
@@ -445,7 +445,7 @@ with tabs[2]:
     metadata = {
         "model": "verification-demo",
         "timestamp": int(time.time()),
-        "version": "2.0.0",
+        "version": "2.1.0",
         "key_id": st.session_state.key_id,
     }
 
@@ -524,7 +524,7 @@ with tabs[3]:
         model_id = st.text_input("Model ID:", value="gpt-4-stream-demo")
         org = st.text_input("Organization:", value="StreamlitApp")
         timestamp = st.number_input("Timestamp:", value=int(time.time()))
-        version = st.text_input("Version:", value="2.0.0")
+        version = st.text_input("Version:", value="2.1.0")
         key_id_input = st.text_input("Key ID:", value=st.session_state.key_id, key="stream_key_id")
         metadata = {
             "model_id": model_id,

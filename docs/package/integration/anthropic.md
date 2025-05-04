@@ -56,16 +56,31 @@ text = response.content[0].text
 
 # Create metadata
 metadata = {
-    "model": response.model,
+    # Standard EncypherAI fields:
+    "model_id": response.model,  # Recommended: AI model identifier
+    "timestamp": response.created,  # Mandatory: Anthropic epoch timestamp (if available)
+    # "generationID": response.id,  # Optional: Anthropic response ID if available
+    "signer_id": "anthropic-nonstream-key",  # Mandatory: key pair identifier
+    # Additional Anthropic fields (optional)
     "organization": "YourOrganization",
-    "timestamp": time.time(),
     "input_tokens": response.usage.input_tokens,
-    "output_tokens": response.usage.output_tokens,
-    "key_id": "anthropic-nonstream-key" # Identifier for the key
+    "output_tokens": response.usage.output_tokens
 }
 
 # Embed metadata using UnicodeMetadata
-encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+encoded_text = UnicodeMetadata.embed_metadata(
+    text=text,
+    private_key=private_key,
+    signer_id="anthropic-nonstream-key",
+    timestamp=response.created,  # Use .created if present, otherwise int(time.time())
+    model_id=response.model,
+    # generationID=response.id,  # If available
+    custom_metadata={
+        "organization": "YourOrganization",
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens
+    }
+)
 
 print("Original response:")
 print(text)
@@ -111,10 +126,13 @@ def resolve_public_key(key_id: str) -> Optional[PublicKeyTypes]:
 
 # Create metadata
 metadata = {
-    "model": "claude-3-opus-20240229",
-    "organization": "YourOrganization",
-    "timestamp": time.time(),
-    "key_id": "anthropic-stream-key"
+    # Standard EncypherAI fields:
+    "model_id": "claude-3-opus-20240229",  # Recommended: AI model identifier
+    "timestamp": int(time.time()),  # Mandatory: epoch timestamp
+    # "generationID": None,  # Optional: Anthropic response ID if available
+    "signer_id": "anthropic-stream-key",  # Mandatory: key pair identifier
+    # Additional Anthropic fields (optional)
+    "organization": "YourOrganization"
 }
 
 # Initialize the streaming handler
@@ -279,14 +297,29 @@ if tool_use:
 
     # Create metadata
     metadata = {
-        "model": response.model,
+        # Standard EncypherAI fields:
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: Anthropic epoch timestamp (if available)
+        # "generationID": response.id,  # Optional: Anthropic response ID if available
+        "signer_id": "anthropic-tool-key",  # Mandatory: key pair identifier
+        # Additional Anthropic fields (optional)
         "tool_used": tool_name,
-        "timestamp": time.time(),
-        "key_id": "anthropic-tool-key"
+        "organization": "YourOrganization"
     }
 
     # Embed metadata
-    encoded_text = UnicodeMetadata.embed_metadata(final_text, metadata, private_key)
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text=final_text,
+        private_key=private_key,
+        signer_id="anthropic-tool-key",
+        timestamp=response.created,  # Use .created if present, otherwise int(time.time())
+        model_id=response.model,
+        # generationID=response.id,  # If available
+        custom_metadata={
+            "tool_used": tool_name,
+            "organization": "YourOrganization"
+        }
+    )
 
     print("\nFinal response with embedded metadata:")
     print(encoded_text)
@@ -308,11 +341,25 @@ else:
             text = item.text
             break
     metadata = {
-        "model": response.model,
-        "timestamp": time.time(),
-        "key_id": "anthropic-tool-key" # Use same key_id
+        # Standard EncypherAI fields:
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: Anthropic epoch timestamp (if available)
+        # "generationID": response.id,  # Optional: Anthropic response ID if available
+        "signer_id": "anthropic-tool-key",  # Mandatory: key pair identifier
+        # Additional Anthropic fields (optional)
+        "organization": "YourOrganization"
     }
-    encoded_text = UnicodeMetadata.embed_metadata(text, metadata, private_key)
+    encoded_text = UnicodeMetadata.embed_metadata(
+        text=text,
+        private_key=private_key,
+        signer_id="anthropic-tool-key",
+        timestamp=response.created,  # Use .created if present, otherwise int(time.time())
+        model_id=response.model,
+        # generationID=response.id,  # If available
+        custom_metadata={
+            "organization": "YourOrganization"
+        }
+    )
     print("Response with embedded metadata:")
     print(encoded_text)
     # Verification would be the same as above
@@ -326,9 +373,13 @@ You can create a helper function to extract metadata from Anthropic responses:
 def extract_anthropic_metadata(response):
     """Extract metadata from an Anthropic API response."""
     metadata = {
-        "model": response.model,
-        "organization": "YourOrganization",
-        "timestamp": time.time(),
+        # Standard EncypherAI fields:
+        "model_id": response.model,  # Recommended: AI model identifier
+        "timestamp": response.created,  # Mandatory: Anthropic epoch timestamp (if available)
+        # "generationID": response.id,  # Optional: Anthropic response ID if available
+        "signer_id": "anthropic-nonstream-key",  # Mandatory: key pair identifier
+        # Additional Anthropic fields (optional)
+        "organization": "YourOrganization"
     }
 
     # Add usage information if available
@@ -387,10 +438,14 @@ async def generate_stream(request: Request):
 
     # Create metadata
     metadata = {
-        "model": "claude-3-opus-20240229",
-        "timestamp": time.time(),
-        "user_id": data.get('user_id', 'anonymous'), # Example extra field
-        "key_id": "fastapi-anthropic-key"
+        # Standard EncypherAI fields:
+        "model_id": "claude-3-opus-20240229",  # Recommended: AI model identifier
+        "timestamp": int(time.time()),  # Mandatory: epoch timestamp
+        # "generationID": None,  # Optional: Anthropic response ID if available
+        "signer_id": "fastapi-anthropic-key",  # Mandatory: key pair identifier
+        # Additional Anthropic fields (optional)
+        "organization": "YourOrganization",
+        "user_id": data.get('user_id', 'anonymous') # Example extra field
     }
 
     # Initialize the streaming handler
@@ -471,10 +526,14 @@ async def generate_stream(request: Request):
 
     # Create metadata
     metadata = {
-        "model": "claude-3-opus-20240229",
-        "timestamp": time.time(),
-        "user_id": data.get('user_id', 'anonymous'), # Example extra field
-        "key_id": "fastapi-anthropic-key"
+        # Standard EncypherAI fields:
+        "model_id": "claude-3-opus-20240229",  # Recommended: AI model identifier
+        "timestamp": int(time.time()),  # Mandatory: epoch timestamp
+        # "generationID": None,  # Optional: Anthropic response ID if available
+        "signer_id": "fastapi-anthropic-key",  # Mandatory: key pair identifier
+        # Additional Anthropic fields (optional)
+        "organization": "YourOrganization",
+        "user_id": data.get('user_id', 'anonymous') # Example extra field
     }
 
     # Initialize the streaming handler
