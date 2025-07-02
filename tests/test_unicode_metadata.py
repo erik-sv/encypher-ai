@@ -177,11 +177,11 @@ class TestUnicodeMetadata:
         private_key, _ = key_pair_1
         with pytest.raises(TypeError, match="Input text must be a string"):
             # Now the type check happens before any len() call
-            UnicodeMetadata.embed_metadata(12345, private_key, "test-signer")  # type: ignore
+            UnicodeMetadata.embed_metadata(12345, private_key, "test-signer", timestamp=0)  # type: ignore
         with pytest.raises(TypeError, match="Input text must be a string"):
-            UnicodeMetadata.embed_metadata(None, private_key, "test-signer")  # type: ignore
+            UnicodeMetadata.embed_metadata(None, private_key, "test-signer", timestamp=0)  # type: ignore
         with pytest.raises(TypeError, match="Input text must be a string"):
-            UnicodeMetadata.embed_metadata(["list"], private_key, "test-signer")  # type: ignore
+            UnicodeMetadata.embed_metadata(["list"], private_key, "test-signer", timestamp=0)  # type: ignore
 
 
 @pytest.fixture
