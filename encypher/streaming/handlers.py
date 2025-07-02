@@ -205,13 +205,15 @@ class StreamingHandler:
                 # Embed metadata if signing is enabled and conditions met
                 if self.private_key and self.signer_id and not (self.encode_first_chunk_only and self.has_encoded):
                     final_text = self.accumulated_text
+                    metadata_kwargs = {k: v for k, v in self.metadata.items() if k != "timestamp"}
                     final_text = UnicodeMetadata.embed_metadata(
                         final_text,
                         self.private_key,
                         self.signer_id,
-                        self.metadata_format,
+                        self.metadata.get("timestamp"),
+                        metadata_format=self.metadata_format,
                         target=self.target,
-                        **self.metadata,  # Pass the full metadata dict as kwargs
+                        **metadata_kwargs,
                     )
                     self.has_encoded = True
                     logger.info(f"Successfully encoded metadata into chunk. Encoded: {self.has_encoded}")
@@ -231,13 +233,15 @@ class StreamingHandler:
             # Embed metadata if signing is enabled and conditions met
             if self.private_key and self.signer_id and not (self.encode_first_chunk_only and self.has_encoded):
                 final_text = chunk
+                metadata_kwargs = {k: v for k, v in self.metadata.items() if k != "timestamp"}
                 final_text = UnicodeMetadata.embed_metadata(
                     final_text,
                     self.private_key,
                     self.signer_id,
-                    self.metadata_format,
+                    self.metadata.get("timestamp"),
+                    metadata_format=self.metadata_format,
                     target=self.target,
-                    **self.metadata,  # Pass the full metadata dict as kwargs
+                    **metadata_kwargs,
                 )
                 self.has_encoded = True
                 logger.info(f"Successfully encoded metadata into chunk. Encoded: {self.has_encoded}")
@@ -322,13 +326,15 @@ class StreamingHandler:
             # Embed metadata if signing is enabled and conditions met
             if self.private_key and self.signer_id:
                 final_text = self.accumulated_text
+                metadata_kwargs = {k: v for k, v in self.metadata.items() if k != "timestamp"}
                 final_text = UnicodeMetadata.embed_metadata(
                     final_text,
                     self.private_key,
                     self.signer_id,
-                    self.metadata_format,
+                    self.metadata.get("timestamp"),
+                    metadata_format=self.metadata_format,
                     target=self.target,
-                    **self.metadata,  # Pass the full metadata dict as kwargs
+                    **metadata_kwargs,
                 )
                 self.has_encoded = True
                 self.accumulated_text = ""

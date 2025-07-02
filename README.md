@@ -64,6 +64,11 @@ For a local demonstration, check out the detailed Jupyter Notebook example inclu
 
 This notebook covers key generation, basic and manifest format usage, and tamper detection using the latest version (v2.1.0+).
 
+### PDF Proof of Concept
+
+The repository also contains a small script showcasing PDF generation with embedded metadata:
+[`examples/pdf_proof_of_concept.py`](./encypher/examples/pdf_proof_of_concept.py)
+
 ## Installation
 
 First, install the uv package manager if you don't have it already:

@@ -23,6 +23,8 @@ dependencies = [
     "pyyaml",
     "cryptography",
     "deprecated",
+    "reportlab",
+    "pdfminer.six",
 ]
 
 [project.optional-dependencies]
