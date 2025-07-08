@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import dh, dsa, ec, ed448, ed2551
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 
 from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
+from ..core.crypto_utils import SerializationFormat
 
 # Import logger using relative path
 from ..core.logging_config import logger
@@ -36,6 +37,7 @@ class StreamingHandler:
         private_key: Optional[PrivateKeyTypes] = None,
         signer_id: Optional[str] = None,
         metadata_format: Literal["basic", "manifest"] = "basic",
+        serialization_format: SerializationFormat = SerializationFormat.JSON,
         # Removed hmac_secret_key
     ):
         """
@@ -51,6 +53,7 @@ class StreamingHandler:
             private_key: The private key for signing the metadata.
             signer_id: An identifier for the signer (associated with the public key).
             metadata_format: The structure ('basic' or 'manifest') of the metadata payload.
+            serialization_format: Serialization format for the embedded data ('json', 'cbor', or 'jumbf').
 
         Raises:
             ValueError: If `metadata_format` is invalid, or if `metadata` is provided
@@ -67,6 +70,8 @@ class StreamingHandler:
             raise TypeError("If provided, 'metadata' must be a dictionary.")
         if not isinstance(encode_first_chunk_only, bool):
             raise TypeError("'encode_first_chunk_only' must be a boolean.")
+        if not isinstance(serialization_format, SerializationFormat):
+            raise TypeError("'serialization_format' must be a SerializationFormat value")
         if private_key is not None and not (
             isinstance(private_key, ed25519.Ed25519PrivateKey)
             or isinstance(private_key, rsa.RSAPrivateKey)
@@ -91,6 +96,7 @@ class StreamingHandler:
         self.private_key = private_key
         self.signer_id = signer_id
         self.metadata_format = metadata_format
+        self.serialization_format = serialization_format
 
         # Ensure we have a timestamp if not provided and using basic format
         # Manifest format manages its own timestamps within actions/claims
@@ -112,7 +118,7 @@ class StreamingHandler:
         self.is_accumulating = False  # Flag to indicate if we're in accumulation mode
 
         logger.info(
-            f"StreamingHandler initialized successfully. Signing enabled: {self.private_key is not None}. Metadata format: '{self.metadata_format}'."
+            f"StreamingHandler initialized successfully. Signing enabled: {self.private_key is not None}. Metadata format: '{self.metadata_format}'. Serialization: '{self.serialization_format.value}'."
         )
 
     def _has_sufficient_targets(self, text: str) -> bool:
@@ -210,6 +216,7 @@ class StreamingHandler:
                         self.private_key,
                         self.signer_id,
                         self.metadata_format,
+                        serialization_format=self.serialization_format,
                         target=self.target,
                         **self.metadata,  # Pass the full metadata dict as kwargs
                     )
@@ -236,6 +243,7 @@ class StreamingHandler:
                     self.private_key,
                     self.signer_id,
                     self.metadata_format,
+                    serialization_format=self.serialization_format,
                     target=self.target,
                     **self.metadata,  # Pass the full metadata dict as kwargs
                 )
@@ -327,6 +335,7 @@ class StreamingHandler:
                     self.private_key,
                     self.signer_id,
                     self.metadata_format,
+                    serialization_format=self.serialization_format,
                     target=self.target,
                     **self.metadata,  # Pass the full metadata dict as kwargs
                 )

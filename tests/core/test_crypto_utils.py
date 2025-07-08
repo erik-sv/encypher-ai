@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple, cast
 
 import pytest
+import cbor2
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.serialization import KeySerializationEncryption
@@ -24,6 +25,7 @@ from encypher.core.crypto_utils import (
     serialize_payload,
     sign_payload,
     verify_signature,
+    SerializationFormat,
 )
 
 # --- Helper functions to replace missing functionality ---
@@ -265,6 +267,24 @@ def test_serialize_payload_deterministic(basic_payload_data: BasicPayload):
     # Cast to Dict[str, Any] for serialize_payload
     bytes2 = serialize_payload(cast(Dict[str, Any], payload2))
     assert bytes1 == bytes2
+
+
+def test_serialize_payload_cbor_roundtrip(basic_payload_data: BasicPayload):
+    """Ensure CBOR serialization round-trips correctly."""
+    if cbor2 is None:
+        pytest.skip("cbor2 not installed")
+
+    bytes_data = serialize_payload(cast(Dict[str, Any], basic_payload_data), format=SerializationFormat.CBOR)
+    data = cbor2.loads(bytes_data)
+    assert data["model_id"] == basic_payload_data["model_id"]
+
+
+def test_serialize_payload_jumbf_roundtrip(basic_payload_data: BasicPayload):
+    """Ensure JUMBF serialization uses prefix and round-trips."""
+    bytes_data = serialize_payload(cast(Dict[str, Any], basic_payload_data), format=SerializationFormat.JUMBF)
+    assert bytes_data.startswith(b"JUMBF")
+    json_data = json.loads(bytes_data[5:].decode("utf-8"))
+    assert json_data["model_id"] == basic_payload_data["model_id"]
 
 
 # --- Signing and Verification Tests ---
