@@ -7,7 +7,10 @@ from typing import Any, Callable, Dict, Optional, Tuple, cast
 import pytest
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
 
-from encypher.core.crypto_utils import generate_key_pair  # Needed for manual verification check
+from encypher.core.crypto_utils import (
+    generate_key_pair,
+    SerializationFormat,
+)
 from encypher.core.unicode_metadata import MetadataTarget, UnicodeMetadata
 
 # --- Test Fixtures ---
@@ -209,6 +212,42 @@ class TestUnicodeMetadata:
             assert manifest_payload.get("actions") == original_payload.get("actions")
             assert manifest_payload.get("ai_info") == original_payload.get("ai_info")
             assert manifest_payload.get("custom_claims") == original_payload.get("custom_claims")
+
+    @pytest.mark.parametrize(
+        "serialization_format",
+        [
+            SerializationFormat.JSON,
+            SerializationFormat.CBOR,
+            SerializationFormat.JUMBF,
+        ],
+    )
+    def test_serialization_formats(
+        self,
+        key_pair_1,
+        sample_text,
+        basic_metadata,
+        public_key_provider,
+        serialization_format,
+    ):
+        """Ensure different serialization formats embed and verify correctly."""
+        private_key, _ = key_pair_1
+        signer_id = "signer_1"
+
+        embedded_text = UnicodeMetadata.embed_metadata(
+            text=sample_text,
+            private_key=private_key,
+            signer_id=signer_id,
+            metadata_format="basic",
+            serialization_format=serialization_format,
+            target=MetadataTarget.PUNCTUATION,
+            **basic_metadata,
+        )
+
+        payload, valid, signer = UnicodeMetadata.verify_and_extract_metadata(embedded_text, public_key_provider)
+
+        assert valid is True
+        assert signer == signer_id
+        assert payload.get("model_id") == basic_metadata["model_id"]
 
     def test_embed_metadata_raises_error_if_timestamp_missing(
         self,

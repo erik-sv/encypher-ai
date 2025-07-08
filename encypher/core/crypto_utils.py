@@ -1,4 +1,10 @@
 import json
+from enum import Enum
+
+try:
+    import cbor2
+except Exception:  # pragma: no cover - optional dependency might not be installed
+    cbor2 = None  # type: ignore
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
 
 from cryptography.exceptions import InvalidSignature
@@ -7,6 +13,15 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
 
 from .logging_config import logger
+
+
+class SerializationFormat(str, Enum):
+    """Supported serialization formats for embedding."""
+
+    JSON = "json"
+    CBOR = "cbor"
+    JUMBF = "jumbf"
+
 
 # --- TypedDict Definitions for Metadata Payloads ---
 
@@ -24,6 +39,7 @@ class BasicPayload(TypedDict, total=False):
         generationID (Optional[str]): Optional. Unique identifier for the generation.
         custom_metadata (Optional[Dict[str, Any]]): Optional. Dictionary for custom fields.
     """
+
     model_id: Optional[str]
     generationID: Optional[str]
     custom_metadata: Optional[Dict[str, Any]]
@@ -184,33 +200,50 @@ def verify_signature(public_key: PublicKeyTypes, payload_bytes: bytes, signature
         raise RuntimeError(f"Verification process failed unexpectedly: {e}") from e
 
 
-def serialize_payload(payload: Dict[str, Any]) -> bytes:
-    """
-    Serializes the metadata payload dictionary into canonical JSON bytes.
-    Ensures keys are sorted and uses compact separators for consistency.
+def serialize_payload(payload: Dict[str, Any], format: SerializationFormat = SerializationFormat.JSON) -> bytes:
+    """Serialize a payload dictionary into the chosen format.
+
+    JSON is always canonicalized with sorted keys to ensure determinism. CBOR
+    relies on the optional ``cbor2`` dependency. JUMBF uses a trivial wrapper of
+    canonical JSON bytes prefixed with ``b"JUMBF"`` to signal the format.
 
     Args:
-        payload: The dictionary payload.
+        payload: The dictionary payload to serialize.
+        format: Output serialization format.
 
     Returns:
-        UTF-8 encoded bytes of the canonical JSON string.
+        Bytes representing the serialized payload.
     """
-    payload_type = type(payload).__name__
-    logger.debug(f"Attempting to serialize payload of type: {payload_type}")
-    try:
-        serialized_data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    except TypeError as e:
-        logger.error(f"Serialization failed for payload type {payload_type}: {e}", exc_info=True)
-        raise TypeError(f"Payload is not JSON serializable: {e}")
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during serialization of {payload_type}: {e}",
-            exc_info=True,
-        )
-        raise
 
-    logger.debug(f"Successfully serialized {payload_type} payload ({len(serialized_data)} bytes).")
-    return serialized_data
+    payload_type = type(payload).__name__
+    logger.debug(f"Attempting to serialize payload of type: {payload_type} using format '{format.value}'")
+
+    if format is SerializationFormat.JSON:
+        try:
+            serialized = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        except TypeError as e:
+            logger.error(f"Serialization failed for payload type {payload_type}: {e}", exc_info=True)
+            raise TypeError(f"Payload is not JSON serializable: {e}")
+        return serialized
+
+    if format is SerializationFormat.CBOR:
+        if cbor2 is None:
+            raise RuntimeError("cbor2 package is required for CBOR serialization")
+        try:
+            return cbor2.dumps(payload)
+        except Exception as e:  # pragma: no cover - low level errors
+            logger.error(f"CBOR serialization failed: {e}", exc_info=True)
+            raise
+
+    if format is SerializationFormat.JUMBF:
+        try:
+            json_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        except TypeError as e:
+            logger.error(f"Serialization failed for payload type {payload_type}: {e}", exc_info=True)
+            raise TypeError(f"Payload is not JSON serializable: {e}")
+        return b"JUMBF" + json_bytes
+
+    raise ValueError(f"Unsupported serialization format: {format}")
 
 
 def load_private_key(key_data: Union[bytes, str], password: Optional[bytes] = None) -> ed25519.Ed25519PrivateKey:

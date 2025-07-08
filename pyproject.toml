@@ -23,6 +23,7 @@ dependencies = [
     "pyyaml",
     "cryptography",
     "deprecated",
+    "cbor2",
 ]
 
 [project.optional-dependencies]

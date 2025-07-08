@@ -14,6 +14,7 @@ import warnings
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union, cast
 
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import dh, dsa, ec, ed448, ed25519, rsa, x448, x25519
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -21,7 +22,16 @@ from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, Pub
 from deprecated import deprecated
 
 from .constants import MetadataTarget
-from .crypto_utils import BasicPayload, ManifestPayload, OuterPayload, serialize_payload, sign_payload, verify_signature
+from .crypto_utils import (
+    BasicPayload,
+    ManifestPayload,
+    OuterPayload,
+    SerializationFormat,
+    cbor2,
+    serialize_payload,
+    sign_payload,
+    verify_signature,
+)
 from .logging_config import logger
 
 
@@ -282,9 +292,10 @@ class UnicodeMetadata:
         text: str,
         private_key: PrivateKeyTypes,
         signer_id: str,
-        timestamp: Union[str, datetime, date, int, float],
         metadata_format: Literal["basic", "manifest"] = "basic",
+        serialization_format: SerializationFormat = SerializationFormat.JSON,
         model_id: Optional[str] = None,
+        timestamp: Optional[Union[str, datetime, date, int, float]] = None,
         generationID: Optional[str] = None,
         target: Optional[Union[str, MetadataTarget]] = None,
         custom_metadata: Optional[Dict[str, Any]] = None,
@@ -310,6 +321,7 @@ class UnicodeMetadata:
             signer_id: A string identifying the signer/key pair.
             timestamp: Timestamp (datetime, ISO string, int/float epoch). **This field is mandatory.**
             metadata_format: The format for the metadata payload ('basic' or 'manifest'). Default is 'basic'.
+            serialization_format: How to serialize the embedded payload ('json', 'cbor', or 'jumbf').
             model_id: Model identifier (recommended for 'basic').
             generationID: Optional unique identifier for the generation.
             target: Where to embed metadata ('whitespace', 'punctuation', etc.).
@@ -326,7 +338,7 @@ class UnicodeMetadata:
         """
         logger.debug(
             f"embed_metadata called with text (type={type(text).__name__}), signer_id='{signer_id}', "
-            f"format='{metadata_format}', target='{target}', distribute={distribute_across_targets}"
+            f"format='{metadata_format}', serialization='{serialization_format.value}', target='{target}', distribute={distribute_across_targets}"
         )
         # --- Start: Input Validation ---
         if not isinstance(text, str):
@@ -364,6 +376,9 @@ class UnicodeMetadata:
         if metadata_format not in ("basic", "manifest"):
             logger.error("metadata_format must be 'basic' or 'manifest'.")
             raise ValueError("metadata_format must be 'basic' or 'manifest'.")
+
+        if not isinstance(serialization_format, SerializationFormat):
+            raise ValueError("serialization_format must be a SerializationFormat value")
 
         if model_id is not None and not isinstance(model_id, str):
             logger.error("If provided, 'model_id' must be a string.")
@@ -468,7 +483,7 @@ class UnicodeMetadata:
 
         # 6. Serialize the Outer Object:
         try:
-            outer_bytes = serialize_payload(dict(outer_payload_to_embed))
+            outer_bytes = serialize_payload(dict(outer_payload_to_embed), format=serialization_format)
         except Exception as e:
             logger.error(f"Failed to serialize outer payload: {e}", exc_info=True)
             raise RuntimeError(f"Failed to serialize outer payload: {e}")
@@ -738,6 +753,27 @@ class UnicodeMetadata:
             )
 
     @classmethod
+    def _deserialize_outer_bytes(cls, data: bytes) -> Optional[Dict[str, Any]]:
+        """Attempt to deserialize outer payload bytes using JSON, CBOR, or JUMBF."""
+        if data.startswith(b"JUMBF"):
+            try:
+                return cast(Dict[str, Any], json.loads(data[5:].decode("utf-8")))
+            except Exception:
+                return None
+        # Try JSON first
+        try:
+            return cast(Dict[str, Any], json.loads(data.decode("utf-8")))
+        except Exception:
+            pass
+        # Fallback to CBOR if available
+        if cbor2 is not None:
+            try:
+                return cast(Dict[str, Any], cbor2.loads(data))
+            except Exception:
+                return None
+        return None
+
+    @classmethod
     def _extract_outer_payload(cls, text: str) -> Optional[OuterPayload]:
         """Extracts the raw OuterPayload dict from embedded bytes.
 
@@ -765,29 +801,24 @@ class UnicodeMetadata:
         # 2. Optional: Decompress Bytes (if compression was added to embed):
         #    - Check for marker and decompress if needed. (Skipped for now)
 
-        # 3. Deserialize Outer JSON:
-        try:
-            outer_data_str = outer_bytes.decode("utf-8")
-            outer_data = json.loads(outer_data_str)
-            if not isinstance(outer_data, dict):
-                logger.warning("Decoded outer data is not a dictionary.")
-                return None
-
-            # Minimal validation to check required keys for OuterPayload
-            required_keys = ("payload", "signature", "signer_id", "format")
-            if not all(k in outer_data for k in required_keys):
-                missing_keys = [k for k in required_keys if k not in outer_data]
-                logger.warning(f"Extracted outer data missing required keys: {missing_keys}")
-                return None
-
-            logger.debug("Successfully extracted and validated outer payload structure.")
-            # Attempt to cast to TypedDict for structure validation (best effort)
-            # This doesn't deeply validate types within 'payload'
-            return cast(OuterPayload, outer_data)
-
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as e:
-            logger.warning(f"Failed to decode or parse outer payload JSON: {e}", exc_info=False)  # Less noisy logging
+        # 3. Deserialize Outer bytes (JSON, CBOR, or JUMBF)
+        outer_data = cls._deserialize_outer_bytes(outer_bytes)
+        if outer_data is None:
+            logger.warning("Failed to deserialize outer payload bytes")
             return None
+
+        if not isinstance(outer_data, dict):
+            logger.warning("Decoded outer data is not a dictionary.")
+            return None
+
+        required_keys = ("payload", "signature", "signer_id", "format")
+        if not all(k in outer_data for k in required_keys):
+            missing_keys = [k for k in required_keys if k not in outer_data]
+            logger.warning(f"Extracted outer data missing required keys: {missing_keys}")
+            return None
+
+        logger.debug("Successfully extracted and validated outer payload structure.")
+        return cast(OuterPayload, outer_data)
 
     @classmethod
     def verify_metadata(
